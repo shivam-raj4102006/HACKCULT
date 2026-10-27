@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: heritageproof-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-heritage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-heritage_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-heritageproof}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-heritage} -d ${POSTGRES_DB:-heritageproof}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: heritageproof-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PROJECT_NAME: "HeritageProof"
+      ENVIRONMENT: "production"
+      DATABASE_URL: "postgresql+psycopg2://${POSTGRES_USER:-heritage}:${POSTGRES_PASSWORD:-heritage_secret_2026}@db:5432/${POSTGRES_DB:-heritageproof}"
+      SECRET_KEY: ${SECRET_KEY:-heritageproof-super-secret-jwt-key-2026-production-ready}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      STORAGE_DIR: "/app/storage"
+      UPLOAD_DIR: "/app/storage/uploads"
+      REPORT_DIR: "/app/storage/reports"
+    volumes:
+      - backend-storage:/app/storage
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: heritageproof-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "5173:80"
+
+volumes:
+  pgdata:
+    driver: local
+  backend-storage:
+    driver: local
