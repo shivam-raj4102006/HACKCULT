@@ -28,7 +28,7 @@ Indic Script Translation & Glossary Mapping: 0.13 ms
 128-dim Dense Embedding Generation: 0.13 ms
 Hybrid Vector + Lexical Search Retrieval: 0.99 ms
 Evidence-Grounded Q&A End-to-End Synthesis: 0.76 ms
-ReportLab Multi-Page PDF Dossier Compilation: 16.82 ms (5.6 KB signed PDF)
+ReportLab Multi-Page PDF Dossier Compilation: 16.82 ms (5.6 KB signed PDF)(very scalable)
 ---
 
 ## 2. Architecture & Design Principles
