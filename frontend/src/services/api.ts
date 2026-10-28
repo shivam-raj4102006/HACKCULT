@@ -3,11 +3,15 @@ import {
   DEMO_SITES,
   DEMO_JOURNEYS,
   DEMO_QA_DATABASE,
+  DEMO_EVIDENCE_RECORDS,
   DemoDocument,
   DemoSite,
   DemoJourney,
-  DemoQAResponse
+  DemoQAResponse,
+  DemoEvidenceItem
 } from './demoData';
+
+export type { DemoEvidenceItem, DemoDocument, DemoSite, DemoJourney, DemoQAResponse };
 
 export interface HealthData {
   status: string;
@@ -54,8 +58,9 @@ export interface DocumentListResponse {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// In-memory runtime documents list for the demo session (persists simulated uploads)
+// In-memory runtime documents & evidence lists for the demo session (persists during page life)
 let runtimeDocuments: DemoDocument[] = [...DEMO_DOCUMENTS];
+let runtimeEvidence: DemoEvidenceItem[] = [...DEMO_EVIDENCE_RECORDS];
 
 export async function checkHealth(): Promise<HealthData> {
   try {
@@ -98,7 +103,7 @@ export async function uploadDocument(file: File): Promise<DocumentItem> {
       return isZip && data.documents ? data.documents[0] : data;
     }
   } catch {
-    // Fall through to realistic client-side simulation
+    // Fall through to client-side simulation
   }
 
   // Client-side simulated archival ingestion
@@ -124,7 +129,7 @@ export async function uploadDocument(file: File): Promise<DocumentItem> {
       author: 'Verified Research Contributor',
       title: file.name.replace(/\.[^/.]+$/, ''),
       client_ingested: true,
-      simulation_note: 'Processed via Client-Side Ingestion Simulator',
+      simulation_note: 'Processed via Client-Side Ingestion Simulator [Synthetic Demo]',
       extracted_units: simulatedUnits,
       mime_type: file.type
     },
@@ -141,6 +146,49 @@ export async function uploadDocument(file: File): Promise<DocumentItem> {
   return newDoc;
 }
 
+export async function ingestSampleDemoDocument(): Promise<DocumentItem> {
+  const sampleNames = [
+    { name: "Rani_Ki_Vav_Pillar_Stratigraphy_Survey.pdf", type: "application/pdf", size: 3420000, pages: 16 },
+    { name: "Modhera_Sabhamandapa_Astro_Alignments.pptx", type: "application/vnd.openxmlformats-officedocument.presentationml.presentation", size: 4500000, pages: 12 },
+    { name: "Adalaj_Subterranean_Water_Table_1994.docx", type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 1200000, pages: 8 },
+    { name: "Uparkot_Buddhist_Caves_Carving_Notes.pdf", type: "application/pdf", size: 2800000, pages: 10 }
+  ];
+
+  const pick = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+  const simulatedHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
+  const doc: DemoDocument = {
+    id: `doc-sample-${Date.now()}`,
+    original_filename: pick.name,
+    mime_type: pick.type,
+    file_size: pick.size,
+    sha256_hash: simulatedHash,
+    status: 'processed',
+    retry_count: 0,
+    max_retries: 3,
+    total_pages_or_slides: pick.pages,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    file_metadata: {
+      author: 'ASI Western Circle Field Survey Unit',
+      title: pick.name.replace(/_/g, ' ').replace(/\.[^/.]+$/, ''),
+      client_ingested: true,
+      simulation_note: 'Auto-Loaded Sample Archival Document [Synthetic Demo]',
+      extracted_units: pick.pages
+    },
+    job: {
+      id: `job-${Date.now()}`,
+      stage: 'completed',
+      status: 'completed',
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString()
+    }
+  };
+
+  runtimeDocuments.unshift(doc);
+  return doc;
+}
+
 export async function fetchDocuments(statusFilter?: string, search?: string): Promise<DocumentListResponse> {
   try {
     const params = new URLSearchParams();
@@ -152,7 +200,7 @@ export async function fetchDocuments(statusFilter?: string, search?: string): Pr
       return res.json();
     }
   } catch {
-    // Fall back to canonical demo documents
+    // Fall back to demo documents
   }
 
   let filtered = [...runtimeDocuments];
@@ -208,6 +256,63 @@ export async function retryDocument(id: string): Promise<DocumentItem> {
   return runtimeDocuments[0];
 }
 
+export async function fetchEvidence(siteId?: string): Promise<DemoEvidenceItem[]> {
+  try {
+    const url = siteId ? `${API_BASE}/api/v1/evidence?site_id=${encodeURIComponent(siteId)}` : `${API_BASE}/api/v1/evidence`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Use fallback demo evidence
+  }
+
+  if (siteId) {
+    const filtered = runtimeEvidence.filter(e => e.site_id === siteId || e.site_name?.toLowerCase().includes(siteId.toLowerCase()));
+    if (filtered.length > 0) return filtered;
+  }
+  return runtimeEvidence;
+}
+
+export async function reviewEvidence(evidenceId: string, newStatus: 'verified' | 'unverified' | 'rejected', notes?: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/evidence/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer test-token'
+      },
+      body: JSON.stringify({
+        evidence_id: evidenceId,
+        status: newStatus,
+        verification_notes: notes || `Human reviewed via demo verification portal session.`
+      }),
+      signal: AbortSignal.timeout(3000)
+    });
+    if (res.ok) {
+      // Backend updated
+    }
+  } catch {
+    // Backend offline: update local runtime evidence
+  }
+
+  runtimeEvidence = runtimeEvidence.map(ev => {
+    if (ev.id === evidenceId) {
+      return {
+        ...ev,
+        verification_status: newStatus,
+        verified_by: newStatus === 'verified' ? 'Lead Archivist (verifier_demo)' : undefined,
+        verified_at: new Date().toISOString(),
+        verification_notes: notes || (newStatus === 'verified' ? 'Human verified by active researcher session.' : 'Rejected upon archival source inspection.')
+      };
+    }
+    return ev;
+  });
+
+  return true;
+}
+
 export async function fetchSites(): Promise<DemoSite[]> {
   try {
     const res = await fetch(`${API_BASE}/api/v1/sites`, { signal: AbortSignal.timeout(3000) });
@@ -252,6 +357,12 @@ export async function queryRAG(query: string, onlyVerified: boolean = false): Pr
   const normalized = query.toLowerCase().trim();
   for (const [key, response] of Object.entries(DEMO_QA_DATABASE)) {
     if (normalized.includes(key) || key.includes(normalized)) {
+      if (onlyVerified) {
+        return {
+          ...response,
+          citations: response.citations.filter(c => c.verification_status === 'verified')
+        };
+      }
       return response;
     }
   }
@@ -261,8 +372,18 @@ export async function queryRAG(query: string, onlyVerified: boolean = false): Pr
     query,
     status: 'INSUFFICIENT_EVIDENCE',
     confidence_score: 0.0,
-    answer: `INSUFFICIENT_EVIDENCE: The current archival repository focuses on medieval Gujarat heritage (Patan, Modhera, Adalaj). No direct primary citations match query "${query}". In accordance with the HeritageProof Groundedness Charter, speculative answers are refused.`,
+    answer: `INSUFFICIENT_EVIDENCE: The current archival repository focuses on medieval Gujarat heritage (Patan, Modhera, Adalaj, Junagadh). No direct primary citations match query "${query}". In accordance with the HeritageProof Groundedness Charter, speculative answers are refused.`,
     citations: [],
     message: 'Strict Groundedness Charter: Hallucinations are rejected when archival citations are absent.'
   };
+}
+
+export async function resetAllDemoData(): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/v1/demo/reset`, { method: 'POST', signal: AbortSignal.timeout(3000) });
+  } catch {
+    // Backend offline: continue with frontend reset
+  }
+  runtimeDocuments = [...DEMO_DOCUMENTS];
+  runtimeEvidence = [...DEMO_EVIDENCE_RECORDS];
 }

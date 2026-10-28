@@ -21,7 +21,8 @@ import {
   uploadDocument,
   fetchDocuments,
   fetchDocumentDetail,
-  retryDocument
+  retryDocument,
+  ingestSampleDemoDocument
 } from '../services/api';
 
 export const IngestionView: React.FC = () => {
@@ -181,9 +182,28 @@ export const IngestionView: React.FC = () => {
           </div>
           <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-amber-800 bg-amber-50/80 px-3 py-1 rounded-full border border-amber-200">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Interactive Demo Mode: Upload simulator extracts file metadata and creates verified records live.</span>
+            <span>Interactive Demo Mode: Synthetic sample documents preloaded. Click below to simulate ingestion without uploading.</span>
           </div>
         </label>
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={async () => {
+              setUploading(true);
+              try {
+                await ingestSampleDemoDocument();
+                await loadDocuments();
+              } finally {
+                setUploading(false);
+              }
+            }}
+            disabled={uploading}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>⚡ Auto-Ingest Sample Document (No File Upload Needed)</span>
+          </button>
+        </div>
 
         {uploading && (
           <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-amber-700 font-medium">

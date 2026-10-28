@@ -148,9 +148,14 @@ export const HeritageMap: React.FC<{ onNavigateTo3D?: (modelUrl?: string) => voi
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span>Viewport: Northern Gujarat (23.0°N - 24.2°N, 71.8°E - 73.0°E)</span>
             </div>
-            <span className="bg-stone-800/80 px-2.5 py-1.5 rounded-lg border border-stone-700">
-              Cartographic Grid: WGS 84
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="bg-amber-900/60 text-amber-300 border border-amber-700/60 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold">
+                Illustrative Demo Coordinates
+              </span>
+              <span className="bg-stone-800/80 px-2.5 py-1.5 rounded-lg border border-stone-700">
+                Cartographic Grid: WGS 84
+              </span>
+            </div>
           </div>
 
           {/* Stylized Gujarat Vector / Coordinate Canvas */}

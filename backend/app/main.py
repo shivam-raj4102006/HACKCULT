@@ -16,6 +16,7 @@ from app.api.v1.search import router as search_router
 from app.api.v1.sites import router as sites_router
 from app.api.v1.journeys import router as journeys_router
 from app.api.v1.photogrammetry import router as photogrammetry_router
+from app.api.v1.demo import router as demo_router
 from app.services.seed import seed_gujarat_heritage_data
 
 logger = logging.getLogger("uvicorn.error")
@@ -77,6 +78,7 @@ app.include_router(search_router, prefix=settings.API_V1_STR)
 app.include_router(sites_router, prefix=settings.API_V1_STR)
 app.include_router(journeys_router, prefix=settings.API_V1_STR)
 app.include_router(photogrammetry_router, prefix=settings.API_V1_STR)
+app.include_router(demo_router, prefix=settings.API_V1_STR)
 app.include_router(health_router, prefix=settings.API_V1_STR)
 app.include_router(health_router, prefix="", tags=["Root Health"])
 

@@ -9,6 +9,7 @@ import {
   AlertCircle,
   RotateCw
 } from 'lucide-react';
+import { fetchEvidence, reviewEvidence, DemoEvidenceItem } from '../services/api';
 
 interface GapData {
   site_id: string;
@@ -32,16 +33,6 @@ interface GapData {
   }>;
 }
 
-interface EvidenceItem {
-  id: string;
-  document_id: string;
-  page_or_slide_number: number;
-  claim_statement?: string;
-  raw_extracted_text: string;
-  verification_status: string;
-  verification_notes?: string;
-}
-
 interface VerificationPortalProps {
   activeRole: string;
 }
@@ -54,14 +45,16 @@ interface SiteOption {
 const DEMO_SITES: SiteOption[] = [
   { name: "Rani Ki Vav", id: "rani-ki-vav" },
   { name: "Sun Temple Modhera", id: "modhera" },
-  { name: "Adalaj Stepwell (Incomplete Archive Demo)", id: "adalaj" }
+  { name: "Adalaj Stepwell (Incomplete Archive Demo)", id: "adalaj" },
+  { name: "Uparkot Fort & Rock-Cut Caves", id: "uparkot" }
 ];
 
 export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRole }) => {
   const [availableSites, setAvailableSites] = useState<SiteOption[]>(DEMO_SITES);
   const [selectedSite, setSelectedSite] = useState<string>("Rani Ki Vav");
   const [gapData, setGapData] = useState<GapData | null>(null);
-  const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
+  const [evidenceList, setEvidenceList] = useState<DemoEvidenceItem[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'unverified' | 'rejected'>('all');
   const [loading, setLoading] = useState<boolean>(true);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -73,21 +66,14 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
     try {
       setLoading(true);
 
-      // Fetch evidence records
-      try {
-        const sitesRes = await fetch('/api/v1/evidence');
-        if (sitesRes.ok) {
-          const evs = await sitesRes.json();
-          setEvidenceList(evs);
-        }
-      } catch (err) {
-        console.warn("Could not load evidence records:", err);
-      }
+      // Fetch evidence records from api service (with robust fallback)
+      const evs = await fetchEvidence();
+      setEvidenceList(evs);
 
-      // Fetch sites list from backend
+      // Fetch sites list from backend if available
       let currentSites = availableSites;
       try {
-        const sitesRes = await fetch('/api/v1/sites');
+        const sitesRes = await fetch('/api/v1/sites', { signal: AbortSignal.timeout(2000) });
         if (sitesRes.ok) {
           const data = await sitesRes.json();
           const list = Array.isArray(data) ? data : data.value || [];
@@ -99,8 +85,8 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
             setAvailableSites(currentSites);
           }
         }
-      } catch (err) {
-        console.warn("Could not load sites list:", err);
+      } catch {
+        // Use demo sites
       }
 
       // Determine active site ID for gap analysis
@@ -110,7 +96,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
       // Try fetching real gap analysis from API
       let gapLoaded = false;
       try {
-        const gapRes = await fetch(`/api/v1/evidence/gap-analysis/${encodeURIComponent(targetSiteId)}`);
+        const gapRes = await fetch(`/api/v1/evidence/gap-analysis/${encodeURIComponent(targetSiteId)}`, { signal: AbortSignal.timeout(2000) });
         if (gapRes.ok) {
           const data = await gapRes.json();
           if (data && data.checklist) {
@@ -118,15 +104,15 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
             gapLoaded = true;
           }
         }
-      } catch (err) {
-        console.warn("Gap analysis API call failed, falling back to canonical data:", err);
+      } catch {
+        // Fallback
       }
 
       if (!gapLoaded) {
         // Fallback demonstration gap data based on selected monument
         if (selectedSite.includes("Adalaj")) {
           setGapData({
-            site_id: activeSite?.id || "adalaj-id",
+            site_id: activeSite?.id || "adalaj",
             site_name: "Adalaj Stepwell",
             completeness_score: 28.6,
             disclaimer: "DISCLAIMER: The Documentation Completeness Score is an archival and research coverage metric reflecting the comprehensiveness of historical records. It is strictly NOT a structural safety, civil engineering, or physical integrity evaluation.",
@@ -150,7 +136,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
           });
         } else if (selectedSite.includes("Modhera")) {
           setGapData({
-            site_id: activeSite?.id || "modhera-id",
+            site_id: activeSite?.id || "modhera",
             site_name: "Sun Temple Modhera",
             completeness_score: 71.4,
             disclaimer: "DISCLAIMER: The Documentation Completeness Score is an archival and research coverage metric reflecting the comprehensiveness of historical records. It is strictly NOT a structural safety, civil engineering, or physical integrity evaluation.",
@@ -170,9 +156,31 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
               { category: "drawings", requirement: "Reconstruction Plan", actionable_task: "Archive Burgess 1888 architectural elevation drawings.", priority: "MEDIUM" }
             ]
           });
+        } else if (selectedSite.includes("Uparkot")) {
+          setGapData({
+            site_id: activeSite?.id || "uparkot",
+            site_name: "Uparkot Fort & Rock-Cut Caves",
+            completeness_score: 64.3,
+            disclaimer: "DISCLAIMER: The Documentation Completeness Score is an archival and research coverage metric reflecting the comprehensiveness of historical records. It is strictly NOT a structural safety, civil engineering, or physical integrity evaluation.",
+            total_categories: 7,
+            fulfilled_categories: 4,
+            checklist: [
+              { id: "1", category: "location", item_name: "Precise Geospatial Coordinates (Junagadh Plateau)", is_fulfilled: true },
+              { id: "2", category: "construction_date", item_name: "Mauryan to Chudasama Epigraph Chronology", is_fulfilled: true },
+              { id: "3", category: "elevations", item_name: "Citadel Vertical Relief Profile", is_fulfilled: true },
+              { id: "4", category: "materials", item_name: "Volcanic Basalt Rock Masonry Survey", is_fulfilled: true },
+              { id: "5", category: "features", item_name: "Rock-Cut Caves & Adi Kadi Vav Catalog", is_fulfilled: false, gap_description: "Buddhist monastic chamber excavation notes incomplete." },
+              { id: "6", category: "condition", item_name: "Rampart Wall Weathering Survey", is_fulfilled: false, gap_description: "Eastern curtain wall crack monitoring needed." },
+              { id: "7", category: "drawings", item_name: "Measured Chamber Plans", is_fulfilled: false, gap_description: "Subterranean laser CAD scan not yet cataloged." }
+            ],
+            missing_tasks: [
+              { category: "features", requirement: "Chamber Survey", actionable_task: "Document rock-cut pillar bases in lower Buddhist monastic cell.", priority: "HIGH" },
+              { category: "drawings", requirement: "Laser CAD Scan", actionable_task: "Conduct 3D photogrammetry of Adi Kadi Vav descent.", priority: "MEDIUM" }
+            ]
+          });
         } else {
           setGapData({
-            site_id: activeSite?.id || "rani-id",
+            site_id: activeSite?.id || "rani-ki-vav",
             site_name: "Rani Ki Vav",
             completeness_score: 85.7,
             disclaimer: "DISCLAIMER: The Documentation Completeness Score is an archival and research coverage metric reflecting the comprehensiveness of historical records. It is strictly NOT a structural safety, civil engineering, or physical integrity evaluation.",
@@ -204,28 +212,24 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
     loadData();
   }, [selectedSite]);
 
-  const handleReview = async (evidenceId: string, newStatus: string) => {
+  const handleReview = async (evidenceId: string, newStatus: 'verified' | 'unverified' | 'rejected') => {
     if (!canVerify) {
-      alert("Permission Denied: Human verification requires Researcher or Administrator credentials.");
+      alert("Permission Denied: Human verification requires Researcher or Verifier credentials. Please switch your role in the top-right header selector.");
       return;
     }
 
     try {
       setReviewingId(evidenceId);
-      await fetch('/api/v1/evidence/review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-token'
-        },
-        body: JSON.stringify({
-          evidence_id: evidenceId,
-          status: newStatus,
-          verification_notes: `Human verified by active ${activeRole} session.`
-        })
-      }).catch(() => {});
-      // Update local state
-      setEvidenceList(prev => prev.map(ev => ev.id === evidenceId ? { ...ev, verification_status: newStatus } : ev));
+      await reviewEvidence(
+        evidenceId,
+        newStatus,
+        newStatus === 'verified'
+          ? `Verified by active session (${activeRole}) with archival corroboration.`
+          : `Rejected by active session (${activeRole}) upon primary epigraphic inspection.`
+      );
+      // Reload evidence list
+      const updated = await fetchEvidence();
+      setEvidenceList(updated);
     } finally {
       setReviewingId(null);
     }
@@ -237,7 +241,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
       setDownloadError(null);
 
       const activeSite = availableSites.find(s => s.name === selectedSite || s.id === selectedSite);
-      const targetSiteId = activeSite?.id || (gapData?.site_id ? gapData.site_id : "rani-ki-vav-id");
+      const targetSiteId = activeSite?.id || (gapData?.site_id ? gapData.site_id : "rani-ki-vav");
 
       let blob: Blob;
       let filename = `HeritageProof_Dossier_${selectedSite.replace(/[^a-zA-Z0-9_-]/g, '_')}.txt`;
@@ -245,9 +249,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
       try {
         const response = await fetch(`/api/v1/reports/site/${encodeURIComponent(targetSiteId)}/download-direct`, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/pdf, application/json'
-          },
+          headers: { 'Accept': 'application/pdf, application/json' },
           signal: AbortSignal.timeout(3000)
         });
 
@@ -263,7 +265,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
           "================================================================================",
           `HERITAGEPROOF ARCHIVAL EVIDENCE & VERIFICATION DOSSIER: ${gapData?.site_name || selectedSite}`,
           "================================================================================",
-          `Generated: ${new Date().toISOString()} | Mode: Frontend Verified Demo Session`,
+          `Generated: ${new Date().toISOString()} | Mode: Verified Demo Session [Synthetic Sample Data]`,
           `Documentation Completeness Score: ${gapData?.completeness_score || 85.7}%`,
           "",
           "LEGAL / CONSERVATION DISCLAIMER:",
@@ -282,12 +284,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
           "--------------------------------------------------------------------------------",
           "HUMAN VERIFICATION AUDIT TRAIL",
           "--------------------------------------------------------------------------------",
-          "1. Claim: Rani Ki Vav commissioned 1063 CE by Queen Udayamati (Solanki dynasty).",
-          "   Status: VERIFIED (Human Lead Archivist)",
-          "   Citation: Rani_Ki_Vav_Survey_1988.pdf, Page 3",
-          "2. Claim: Sun Temple Modhera constructed 1026 CE during King Bhima I reign.",
-          "   Status: VERIFIED (Human Inscription Specialist)",
-          "   Citation: Modhera_Sun_Temple_Monograph.pdf, Page 4",
+          ...evidenceList.map((ev, i) => `${i + 1}. Claim: ${ev.claim_statement}\n   Status: ${ev.verification_status.toUpperCase()} | Source: ${ev.document_name || 'Archival Record'} (p. ${ev.page_or_slide_number})\n   Notes: ${ev.verification_notes || 'Pending human evaluation'}`),
           "",
           "================================================================================",
           "END OF DOSSIER — HERITAGEPROOF ARCHIVAL SYSTEM",
@@ -314,12 +311,22 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
     }
   };
 
+  const filteredEvidence = evidenceList.filter(ev => {
+    if (statusFilter === 'all') return true;
+    return ev.verification_status === statusFilter;
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Banner: Site Selector & Role Warning */}
       <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-100">
           <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                Demo Mode — Synthetic Sample Evidence
+              </span>
+            </div>
             <h2 className="text-lg font-bold text-stone-900 flex items-center space-x-2">
               <ShieldCheck className="w-5 h-5 text-amber-600" />
               <span>Evidence Verification & Gap Analysis Hub</span>
@@ -346,16 +353,16 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
         </div>
 
         {/* Human-Only Rule Banner */}
-        <div className="mt-4 p-3.5 rounded-lg bg-amber-50/70 border border-amber-200/80 flex items-start justify-between text-xs">
+        <div className="mt-4 p-3.5 rounded-lg bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-start space-x-2">
             <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
             <div className="text-amber-900">
               <span className="font-bold">Human-Only Verification Mandate: </span>
-              <span>AI models can extract claims, but <strong>never</strong> mark them verified. Verification status can only be updated by researchers or verifiers with verifiable timestamps.</span>
+              <span>AI models can extract claims, but <strong>never</strong> mark them verified. Verification status can only be certified by researchers or verifiers with verifiable audit timestamps.</span>
             </div>
           </div>
-          <span className="ml-4 font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-amber-200/70 text-amber-900 uppercase">
-            Active: {activeRole}
+          <span className="font-mono font-bold text-[11px] px-2.5 py-1 rounded bg-amber-200/80 text-amber-900 uppercase shrink-0">
+            Active Role: {activeRole}
           </span>
         </div>
       </div>
@@ -380,7 +387,7 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
                     Documentation Completeness: {gapData.site_name}
                   </h3>
                   <p className="text-xs text-stone-600 mt-1">
-                    {gapData.fulfilled_categories} of {gapData.total_categories} canonical documentation categories fulfilled with verifiable archival citations.
+                    {gapData.fulfilled_categories} of {gapData.total_categories} canonical documentation categories fulfilled with archival citations.
                   </p>
 
                   <div className="w-64 bg-stone-100 rounded-full h-2.5 mt-3 overflow-hidden border border-stone-200">
@@ -402,12 +409,12 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
                   {downloading ? (
                     <>
                       <RotateCw className="w-4 h-4 animate-spin text-amber-400" />
-                      <span>Generating Dossier PDF...</span>
+                      <span>Generating Dossier Report...</span>
                     </>
                   ) : (
                     <>
                       <Download className="w-4 h-4 text-amber-400" />
-                      <span>Download PDF Dossier Report</span>
+                      <span>Download Certified Dossier (PDF)</span>
                     </>
                   )}
                 </button>
@@ -449,53 +456,54 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
                   <FileCheck className="w-4 h-4 text-amber-600" />
                   <span>Documentation Checklist (7 Categories)</span>
                 </h3>
-                <span className="text-[10px] font-mono text-stone-400">
+                <span className="text-[10px] font-mono text-stone-500">
                   {gapData.fulfilled_categories}/{gapData.total_categories} Fulfilled
                 </span>
               </div>
 
-              <div className="p-4 divide-y divide-stone-100 overflow-y-auto max-h-[360px]">
+              <div className="p-4 space-y-2.5 overflow-y-auto max-h-[360px]">
                 {gapData.checklist.map((item) => (
-                  <div key={item.id} className="py-3 flex items-start justify-between text-xs">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        {item.is_fulfilled ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        ) : (
-                          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        )}
-                        <span className="font-bold text-stone-900 capitalize">
-                          {item.category.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <p className="text-stone-600 text-[11px] mt-0.5 ml-6">{item.item_name}</p>
-                      {item.gap_description && !item.is_fulfilled && (
-                        <p className="text-red-600 text-[10px] font-mono mt-1 ml-6 bg-red-50 p-1.5 rounded border border-red-200/60">
-                          Gap: {item.gap_description}
-                        </p>
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-lg border border-stone-200 bg-stone-50/50 flex items-start justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-start space-x-2.5">
+                      {item.is_fulfilled ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                       )}
+                      <div>
+                        <span className="font-semibold text-stone-800 block">
+                          {item.item_name}
+                        </span>
+                        {item.gap_description && (
+                          <span className="text-stone-500 text-[11px] block mt-0.5 italic">
+                            Gap: {item.gap_description}
+                          </span>
+                        )}
+                      </div>
                     </div>
-
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase flex-shrink-0 ml-3 ${
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase shrink-0 ${
                         item.is_fulfilled
                           ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-red-100 text-red-800'
+                          : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {item.is_fulfilled ? 'Fulfilled' : 'Gap'}
+                      {item.is_fulfilled ? 'Verified' : 'Archival Gap'}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Auto-Generated Missing Evidence Task List */}
+            {/* Actionable Field Tasks */}
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
               <div className="px-5 py-3.5 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
                 <h3 className="text-xs font-bold text-stone-900 flex items-center space-x-1.5">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span>Auto-Generated Missing-Evidence Tasks</span>
+                  <span>Auto-Generated Gap Remediation Tasks</span>
                 </h3>
                 <span className="text-[10px] font-mono text-stone-400">
                   {gapData.missing_tasks.length} Pending Actions
@@ -550,106 +558,166 @@ export const VerificationPortal: React.FC<VerificationPortalProps> = ({ activeRo
 
       {/* Human Evidence Verification Review Queue */}
       <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-bold text-stone-900">
-              Extracted Claims Verification Queue
+            <h3 className="text-sm font-bold text-stone-900 flex items-center gap-2">
+              <span>Extracted Claims Verification Queue</span>
+              <span className="text-xs font-mono font-normal text-stone-400">
+                ({filteredEvidence.length} of {evidenceList.length} claims shown)
+                {loading && <RotateCw className="w-3 h-3 animate-spin text-amber-600 inline ml-1.5" />}
+              </span>
             </h3>
             <span className="text-xs text-stone-500">
               Review and certify extracted architectural claims with immutable audit timestamps.
             </span>
           </div>
 
-          <div className="flex items-center space-x-3 text-xs text-stone-400 font-mono">
-            {loading && <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-600" />}
-            <span>{evidenceList.length > 0 ? evidenceList.length : 2} Claims Indexed</span>
-            <span>•</span>
-            <span>Requires Researcher / Verifier Role</span>
+          {/* Filter Status Selector */}
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-stone-400 font-mono">Status:</span>
+            <div className="inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
+              {(['all', 'unverified', 'verified', 'rejected'] as const).map(status => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors ${
+                    statusFilter === status
+                      ? 'bg-stone-900 text-amber-400 font-semibold shadow-sm'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  {status === 'unverified' ? 'Pending' : status}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="divide-y divide-stone-100">
-          {/* Sample Verifiable Claim 1 */}
-          <div className="p-6 hover:bg-stone-50/50 transition-colors flex flex-col sm:flex-row items-start justify-between gap-4">
-            <div className="space-y-1.5 flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="text-[11px] font-mono bg-stone-100 text-stone-700 px-2 py-0.5 rounded border border-stone-200">
-                  Rani_Ki_Vav_Survey.pdf • Page 3
-                </span>
-                <span className="text-[11px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
-                  Verified (Human)
-                </span>
-              </div>
-              <p className="text-sm font-semibold text-stone-900">
-                "Rani Ki Vav was commissioned in 1063 CE by Queen Udayamati of the Solanki dynasty."
-              </p>
-              <p className="text-xs text-stone-500 font-serif italic">
-                Source snippet: "Inscriptional epigraphs confirm Queen Udayamati commissioned the stepped well in 1063 CE following the death of King Bhima I."
-              </p>
-              <div className="text-[11px] text-stone-400 font-mono pt-1">
-                Verified by Lead Archivist (ID: verifier_01) on 2026-10-27T18:30 UTC
-              </div>
+          {filteredEvidence.length === 0 ? (
+            <div className="p-8 text-center text-xs text-stone-400">
+              No claims match current filter: <strong>{statusFilter}</strong>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-emerald-700 font-semibold flex items-center space-x-1">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>Certified</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Sample Verifiable Claim 2 (Pending Review) */}
-          <div className="p-6 hover:bg-stone-50/50 transition-colors flex flex-col sm:flex-row items-start justify-between gap-4 bg-amber-50/20">
-            <div className="space-y-1.5 flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="text-[11px] font-mono bg-stone-100 text-stone-700 px-2 py-0.5 rounded border border-stone-200">
-                  Adalaj_Ni_Vav_Ledger.pptx • Slide 2
-                </span>
-                <span className="text-[11px] font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
-                  Unverified (Pending Review)
-                </span>
-              </div>
-              <p className="text-sm font-semibold text-stone-900">
-                "Adalaj Stepwell was commissioned by Queen Rudabai in 1498 CE with Islamic floral tracery."
-              </p>
-              <p className="text-xs text-stone-500 font-serif italic">
-                Source snippet: "Five-tiered stepwell foundation epigraph commemorates Queen Rudabai during Mahmud Begada reign."
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => handleReview("claim-adalaj-01", "verified")}
-                disabled={!canVerify || reviewingId === "claim-adalaj-01"}
-                className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  canVerify
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                }`}
-                title={!canVerify ? "Requires Researcher role" : "Verify Claim"}
-              >
-                {reviewingId === "claim-adalaj-01" ? (
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
-                )}
-                <span>Verify Claim</span>
-              </button>
-              <button
-                onClick={() => handleReview("claim-adalaj-01", "rejected")}
-                disabled={!canVerify}
-                className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                  canVerify
-                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+          ) : (
+            filteredEvidence.map((ev) => (
+              <div
+                key={ev.id}
+                className={`p-6 hover:bg-stone-50/50 transition-colors flex flex-col sm:flex-row items-start justify-between gap-4 ${
+                  ev.verification_status === 'unverified'
+                    ? 'bg-amber-50/20'
+                    : ev.verification_status === 'rejected'
+                    ? 'bg-red-50/10'
+                    : ''
                 }`}
               >
-                <XCircle className="w-3.5 h-3.5" />
-                <span>Reject</span>
-              </button>
-            </div>
-          </div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-mono bg-stone-100 text-stone-700 px-2 py-0.5 rounded border border-stone-200">
+                      {ev.document_name || 'Archival Record'} • Page {ev.page_or_slide_number}
+                    </span>
+                    <span
+                      className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                        ev.verification_status === 'verified'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : ev.verification_status === 'rejected'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {ev.verification_status === 'verified'
+                        ? 'Verified (Human Certified)'
+                        : ev.verification_status === 'rejected'
+                        ? 'Rejected (Disproven Claim)'
+                        : 'Unverified (Pending Review)'}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-semibold text-stone-900">
+                    "{ev.claim_statement}"
+                  </p>
+
+                  <p className="text-xs text-stone-500 font-serif italic">
+                    Source snippet: "{ev.raw_extracted_text}"
+                  </p>
+
+                  {ev.verification_notes && (
+                    <div className="text-[11px] text-stone-500 font-mono pt-1">
+                      {ev.verification_notes}
+                    </div>
+                  )}
+                </div>
+
+                {/* Review Action Controls */}
+                <div className="flex items-center space-x-2 shrink-0">
+                  {ev.verification_status === 'unverified' ? (
+                    <>
+                      <button
+                        onClick={() => handleReview(ev.id, 'verified')}
+                        disabled={!canVerify || reviewingId === ev.id}
+                        className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          canVerify
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                            : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                        }`}
+                        title={!canVerify ? "Requires Researcher role (switch in header)" : "Certify Claim"}
+                      >
+                        {reviewingId === ev.id ? (
+                          <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        )}
+                        <span>Certify Claim</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleReview(ev.id, 'rejected')}
+                        disabled={!canVerify || reviewingId === ev.id}
+                        className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          canVerify
+                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                            : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                        }`}
+                        title={!canVerify ? "Requires Researcher role (switch in header)" : "Reject Claim"}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
+                    </>
+                  ) : ev.verification_status === 'verified' ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-emerald-700 font-semibold flex items-center space-x-1">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>Certified</span>
+                      </span>
+                      {canVerify && (
+                        <button
+                          onClick={() => handleReview(ev.id, 'unverified')}
+                          className="text-[11px] text-stone-400 hover:text-stone-700 underline ml-2"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-red-700 font-semibold flex items-center space-x-1">
+                        <XCircle className="w-4 h-4 text-red-600" />
+                        <span>Rejected</span>
+                      </span>
+                      {canVerify && (
+                        <button
+                          onClick={() => handleReview(ev.id, 'unverified')}
+                          className="text-[11px] text-stone-400 hover:text-stone-700 underline ml-2"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

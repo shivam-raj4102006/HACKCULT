@@ -11,8 +11,10 @@ import {
   ShieldCheck,
   Layers,
   CheckCircle,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
+import { resetAllDemoData } from './services/api';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('overview');
@@ -22,6 +24,14 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] text-[#1C1917] flex flex-col font-sans">
+      {/* Top Demo Mode Indicator Banner */}
+      <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-1.5 text-center text-xs font-medium text-amber-950 flex items-center justify-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
+        <span>
+          <strong>Demo Mode — Synthetic Sample Data:</strong> Demonstrating Indian heritage archival verification inspired by Gujarat monuments for academic/hackathon evaluation.
+        </span>
+      </div>
+
       <Navbar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -56,7 +66,20 @@ export const App: React.FC = () => {
                 : 'Multi-format archival ingestion, human-only claim verification, and spatial provenance.'}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={async () => {
+                if (window.confirm("Reload / Reset all demo data to canonical initial state?")) {
+                  await resetAllDemoData();
+                  window.location.reload();
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-mono bg-stone-100 hover:bg-stone-200 text-stone-700 px-3 py-1.5 rounded-full border border-stone-300 transition-colors shadow-sm"
+              title="Reset synthetic demo dataset"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+              <span>Reset Demo Data</span>
+            </button>
             <HealthBadge />
           </div>
         </div>

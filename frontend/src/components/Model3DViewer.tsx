@@ -275,12 +275,17 @@ export const Model3DViewer: React.FC = () => {
       {/* Module Header */}
       <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+              Demo Representation — Simulated 3D Geometry
+            </span>
+          </div>
           <h2 className="text-xl font-serif font-bold text-stone-900 flex items-center gap-2">
             <Box className="w-5 h-5 text-terracotta-600" />
             Pathway 1: Computer Vision & 3D Photogrammetry
           </h2>
           <p className="text-sm text-stone-600">
-            WebGL interactive photogrammetry with evidence hotspots, vision tagging, and resilient 2D gallery fallback.
+            Procedural 3D WebGL pavilion representation with evidence hotspots and resilient 2D gallery fallback.
           </p>
         </div>
 

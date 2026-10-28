@@ -31,6 +31,7 @@ export const GroundedQA: React.FC = () => {
     "Who commissioned Rani Ki Vav in Patan?",
     "What are the architectural terrace levels of Rani Ki Vav?",
     "Who constructed the Sun Temple at Modhera?",
+    "Tell me about Uparkot Fort and its rock-cut stepwells.",
     "Who built the Eiffel Tower iron trusses in 1889?"
   ];
 
