@@ -1,4 +1,6 @@
 import os
+import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,21 +18,34 @@ from app.api.v1.journeys import router as journeys_router
 from app.api.v1.photogrammetry import router as photogrammetry_router
 from app.services.seed import seed_gujarat_heritage_data
 
+logger = logging.getLogger("uvicorn.error")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure storage directories exist
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    os.makedirs(settings.REPORT_DIR, exist_ok=True)
-    
-    # Initialize database tables
-    Base.metadata.create_all(bind=engine)
-    
-    # Seed canonical demo monuments (Rani Ki Vav, Modhera, Adalaj)
-    db = SessionLocal()
+    # Ensure storage directories exist safely
     try:
-        seed_gujarat_heritage_data(db)
-    finally:
-        db.close()
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        os.makedirs(settings.REPORT_DIR, exist_ok=True)
+    except (OSError, PermissionError) as e:
+        logger.warning(f"Could not create storage in {settings.UPLOAD_DIR}: {e}. Falling back to temp directory.")
+        import tempfile
+        tmp_base = Path(tempfile.gettempdir()) / "storage"
+        settings.STORAGE_DIR = str(tmp_base)
+        settings.UPLOAD_DIR = str(tmp_base / "uploads")
+        settings.REPORT_DIR = str(tmp_base / "reports")
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        os.makedirs(settings.REPORT_DIR, exist_ok=True)
+    
+    # Initialize database tables & seed canonical demo monuments
+    try:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+        try:
+            seed_gujarat_heritage_data(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Database initialization / seed warning: {e}")
 
     yield
 
@@ -45,6 +60,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
