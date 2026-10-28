@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Compass, Layers, BookOpen } from 'lucide-react';
+import { fetchSites as loadSites, fetchJourneys as loadJourneys } from '../services/api';
 
 interface Site {
   id: string;
@@ -53,12 +54,9 @@ export const HeritageMap: React.FC<{ onNavigateTo3D?: (modelUrl?: string) => voi
 
   const fetchSites = async () => {
     try {
-      const res = await fetch('/api/v1/sites');
-      if (res.ok) {
-        const data = await res.json();
-        setSites(data);
-        if (data.length > 0) setSelectedSite(data[0]);
-      }
+      const data = await loadSites();
+      setSites(data);
+      if (data.length > 0) setSelectedSite(data[0]);
     } catch (e) {
       console.error(e);
     }
@@ -66,16 +64,9 @@ export const HeritageMap: React.FC<{ onNavigateTo3D?: (modelUrl?: string) => voi
 
   const fetchJourneys = async () => {
     try {
-      const res = await fetch('/api/v1/journeys');
-      if (res.ok) {
-        const list = await res.json();
-        if (list.length > 0) {
-          const detailRes = await fetch(`/api/v1/journeys/${list[0].id}`);
-          if (detailRes.ok) {
-            const detail = await detailRes.json();
-            setSelectedJourney(detail);
-          }
-        }
+      const list = await loadJourneys();
+      if (list.length > 0) {
+        setSelectedJourney(list[0]);
       }
     } catch (e) {
       console.error(e);
@@ -196,9 +187,10 @@ export const HeritageMap: React.FC<{ onNavigateTo3D?: (modelUrl?: string) => voi
               const isRani = site.name.includes('Rani');
               const isModhera = site.name.includes('Modhera');
               const isAdalaj = site.name.includes('Adalaj');
+              const isUparkot = site.name.includes('Uparkot');
 
-              const x = isRani ? '70%' : isModhera ? '50%' : isAdalaj ? '35%' : '42%';
-              const y = isRani ? '25%' : isModhera ? '48%' : '76%';
+              const x = isRani ? '70%' : isModhera ? '50%' : isAdalaj ? '35%' : isUparkot ? '22%' : '42%';
+              const y = isRani ? '25%' : isModhera ? '48%' : isAdalaj ? '76%' : isUparkot ? '82%' : '50%';
 
               const isSelected = selectedSite?.id === site.id;
 

@@ -12,7 +12,8 @@ import {
   Eye,
   X,
   Compass,
-  Layers
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import {
   DocumentItem,
@@ -177,6 +178,10 @@ export const IngestionView: React.FC = () => {
           </span>
           <div className="mt-4 flex items-center space-x-2 text-[11px] font-mono text-stone-400 bg-stone-50 px-3 py-1.5 rounded-lg border border-stone-200">
             <span>Supported: PDF, PPTX (Notes+Images), DOCX, JPG/PNG (EXIF GPS), ZIP</span>
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-amber-800 bg-amber-50/80 px-3 py-1 rounded-full border border-amber-200">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>Interactive Demo Mode: Upload simulator extracts file metadata and creates verified records live.</span>
           </div>
         </label>
 

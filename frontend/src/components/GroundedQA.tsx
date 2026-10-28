@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, ShieldAlert, CheckCircle2, AlertCircle, BookOpen, Sparkles, Filter } from 'lucide-react';
+import { queryRAG } from '../services/api';
 
 interface Citation {
   document_id: string;
@@ -42,20 +43,7 @@ export const GroundedQA: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/v1/search/qa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: q,
-          only_verified: onlyVerified
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      const data: QAResponse = await res.json();
+      const data = await queryRAG(q, onlyVerified);
       setQaResult(data);
     } catch (err: any) {
       setError(err.message || 'Failed to query RAG engine');
