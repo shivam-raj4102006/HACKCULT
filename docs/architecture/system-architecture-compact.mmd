@@ -1,0 +1,51 @@
+flowchart LR
+    %% =====================================================================
+    %% HERITAGEPROOF — COMPACT VISUAL ARCHITECTURE DIAGRAM
+    %% =====================================================================
+
+    classDef client fill:#451a03,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+    classDef fe fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5;
+    classDef api fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#dbeafe;
+    classDef ai fill:#4c1d95,stroke:#8b5cf6,stroke-width:2px,color:#ede9fe;
+    classDef human fill:#881337,stroke:#f43f5e,stroke-width:2px,color:#ffe4e6;
+    classDef db fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+
+    subgraph USERS["👤 Users"]
+        U1["Cultural Tourists<br/><i>(Public Explore)</i>"]:::client
+        U2["Archivists & Verifiers<br/><i>(Researcher Mode)</i>"]:::client
+    end
+
+    subgraph FRONTEND["🖥️ React 18 Frontend"]
+        FE1["Interactive Gujarat Map<br/><b>WGS 84 Coordinates</b>"]:::fe
+        FE2["Three.js 3D Viewer<br/><b>Evidence Hotspots</b>"]:::fe
+        FE3["Grounded Q&A UI<br/><b>Page Citations</b>"]:::fe
+    end
+
+    subgraph BACKEND["⚡ FastAPI Gateway"]
+        API1["JWT Auth & RBAC"]:::api
+        API2["9 Modular Routers"]:::api
+    end
+
+    subgraph ENGINE["🧠 Ingestion & AI Engine"]
+        AI1["Multi-Format Parser<br/><i>PDF, PPTX, DOCX, ZIP</i>"]:::ai
+        AI2["SHA-256 Hasher<br/><i>Cryptographic Provenance</i>"]:::ai
+        AI3["128-Dim Hybrid RAG<br/><i>Zero-Hallucination Refusal</i>"]:::ai
+    end
+
+    subgraph VERIFY["🛡️ Human Verification"]
+        H1["Human-Only Mandate<br/><b>AI cannot certify claims</b>"]:::human
+        H2["Audit Logging<br/><b>Immutable Record</b>"]:::human
+    end
+
+    subgraph STORAGE["🗄️ Storage & Output"]
+        DB1[("10 SQLAlchemy Tables<br/>SQLite / PostgreSQL")]:::db
+        OUT1["ReportLab Engine<br/><b>Downloadable PDF Dossiers</b>"]:::db
+    end
+
+    USERS ==>|Browse & Query| FRONTEND
+    FRONTEND ==>|REST JSON / FormData| BACKEND
+    BACKEND ==>|Process & Search| ENGINE
+    ENGINE -->|Unverified Claims| VERIFY
+    VERIFY ==>|Certified Facts| STORAGE
+    ENGINE -.->|Candidate Retrieval| STORAGE
+    STORAGE -.->|Dossier PDF / Metadata| FRONTEND
