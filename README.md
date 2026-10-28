@@ -60,6 +60,8 @@ Both services run locally out of the box:
 - **FastAPI Backend**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - **Interactive Swagger Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
+- veercel deploy-https://hackcult-five.vercel.app
+
 ### Manual Native Execution
 
 #### Backend (FastAPI + Python)
