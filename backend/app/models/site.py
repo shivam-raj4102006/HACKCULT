@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Float, Text, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Session
 from app.core.database import Base
 from app.models.base import BaseModelMixin
 
