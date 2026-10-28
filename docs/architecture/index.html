@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HeritageProof — System Architecture & Data Flow Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #070B14;
+      --card-bg: #0E1626;
+      --card-border: #1E293B;
+      --teal-accent: #14B8A6;
+      --teal-glow: rgba(20, 184, 166, 0.25);
+      --amber-accent: #F59E0B;
+      --blue-accent: #38BDF8;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: rgba(14, 22, 38, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #070B14;
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 0.4rem;
+      background: #090F1B;
+      padding: 0.3rem;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 0.9rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      background: var(--teal-accent);
+      color: #070B14;
+      box-shadow: 0 0 12px var(--teal-glow);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .badge-status {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.72rem;
+      font-family: 'Fira Code', monospace;
+      background: rgba(20, 184, 166, 0.12);
+      border: 1px solid rgba(20, 184, 166, 0.3);
+      color: var(--teal-accent);
+      padding: 0.35rem 0.7rem;
+      border-radius: 9999px;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--teal-accent);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(20, 184, 166, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1500px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+
+    .diagram-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .diagram-panel.active {
+      display: flex;
+    }
+
+    /* Card styling */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-header {
+      padding: 1rem 1.5rem;
+      background: rgba(14, 22, 38, 0.7);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-tool {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: var(--text-main);
+      padding: 0.35rem 0.7rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-tool:hover {
+      background: #334155;
+    }
+
+    .diagram-viewport {
+      padding: 2rem;
+      overflow-x: auto;
+      background: #0B1120;
+      display: flex;
+      justify-content: center;
+      min-height: 480px;
+    }
+
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Notes section */
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .note-box {
+      background: #0D1524;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .note-box h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--teal-accent);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .note-box p, .note-box ul {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .note-box ul {
+      padding-left: 1.2rem;
+      margin-top: 0.4rem;
+    }
+
+    /* Presentation Deck Tab */
+    .speech-box {
+      background: #0E1A2D;
+      border: 1px solid #1D3354;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .speech-box h3 {
+      font-size: 1.1rem;
+      color: var(--amber-accent);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .speech-script {
+      background: #070D18;
+      border: 1px solid #1E293B;
+      padding: 1.2rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: #E2E8F0;
+      margin-top: 0.8rem;
+      border-left: 4px solid var(--teal-accent);
+    }
+
+    .speech-script.hinglish {
+      border-left: 4px solid var(--amber-accent);
+    }
+
+    /* Legend */
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      padding: 0.75rem 1.5rem;
+      background: #0A0F1D;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.75rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-bullet {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* Footer */
+    footer {
+      background: #090E1A;
+      border-top: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'Fira Code', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">HP</div>
+      <div>
+        <div class="brand-title">HeritageProof Architecture Suite</div>
+        <div class="brand-subtitle">Archival Evidence Verification & Spatial Provenance</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('system')">🏛️ System Architecture</button>
+      <button class="tab-btn" onclick="switchTab('dataflow')">🔄 Data Flow</button>
+      <button class="tab-btn" onclick="switchTab('er')">🗄️ Database ER</button>
+      <button class="tab-btn" onclick="switchTab('deploy')">🚀 Deployment</button>
+      <button class="tab-btn" onclick="switchTab('speech')">🎤 Presentation Pitch</button>
+    </nav>
+
+    <div class="header-actions">
+      <div class="badge-status">
+        <span class="pulse-dot"></span>
+        <span>Demo Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Viewports -->
+  <main>
+
+    <!-- TAB 1: SYSTEM ARCHITECTURE -->
+    <div id="tab-system" class="diagram-panel active">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🏛️ Complete 7-Layer System Architecture</span>
+          </div>
+          <div class="controls">
+            <button class="btn-tool" onclick="copyMermaid('mermaid-system')">📋 Copy Mermaid</button>
+            <button class="btn-tool" onclick="toggleFullscreen('tab-system')">⛶ Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="diagram-viewport">
+          <div id="mermaid-system" class="mermaid">
+graph TB
+    subgraph CLIENT_LAYER["1. Presentation & Client Layer"]
+        U_PUBLIC["👤 Cultural Tourist / Explorer<br/><i>(Read-only, 3D Orbit, Trails)</i>"]
+        U_RESEARCHER["🔬 Researcher & Archivist<br/><i>(Ingestion, OCR Audit, Verification)</i>"]
+        U_ADMIN["🛡️ System Administrator<br/><i>(RBAC, Security, Audit Logs)</i>"]
+    end
+
+    subgraph FRONTEND_LAYER["2. Frontend Web Application (React 18 + Vite + TailwindCSS)"]
+        direction TB
+        NAV["🧭 Navigation & Role Switcher<br/><code>Navbar.tsx</code> • <i>verifier vs public</i>"]
+        STATUS_BADGE["🟢 Health & Demo Status Banner<br/><code>HealthBadge.tsx</code> • <i>Frontend Online</i>"]
+        
+        subgraph FE_MODULES["Core UI Feature Modules"]
+            FE_OVERVIEW["📊 Capabilities Matrix<br/><code>App.tsx (Overview)</code>"]
+            FE_INGEST["📥 Ingestion Tracker<br/><code>IngestionView.tsx</code>"]
+            FE_OCR["🔤 3-Column OCR Audit<br/><code>OCRComparison.tsx</code>"]
+            FE_VERIFY["✅ Verification Portal<br/><code>VerificationPortal.tsx</code>"]
+            FE_RAG["🔍 Grounded Q&A<br/><code>GroundedQA.tsx</code>"]
+            FE_MAP["🗺️ Gujarat Heritage Map<br/><code>HeritageMap.tsx (WGS 84)</code>"]
+            FE_3D["🏛️ 3D Photogrammetry<br/><code>Model3DViewer.tsx (Three.js)</code>"]
+        end
+
+        subgraph FE_SERVICES["Client State & Data Adapters"]
+            API_CLIENT["📡 API Client Layer<br/><code>src/services/api.ts</code>"]
+            DEMO_STORE["💾 Canonical Demo Store<br/><code>src/services/demoData.ts</code>"]
+        end
+    end
+
+    subgraph API_LAYER["3. API Gateway & Application Server (FastAPI + Uvicorn)"]
+        direction TB
+        FASTAPI_CORE["⚡ FastAPI Application Instance<br/><code>backend/app/main.py</code> • <i>Lifespan Management</i>"]
+        CORS_MW["🛡️ CORS Middleware<br/><i>(Localhost + *.vercel.app Regex)</i>"]
+        AUTH_MW["🔐 Security & Auth Dependencies<br/><code>app/api/deps.py</code> • <i>JWT Bearer + RBAC</i>"]
+        
+        subgraph ROUTERS["API v1 Routers (prefix: /api/v1)"]
+            R_HEALTH["/health<br/><code>health.py</code>"]
+            R_AUTH["/auth<br/><code>auth.py</code>"]
+            R_DOCS["/documents<br/><code>documents.py</code>"]
+            R_OCR["/ocr<br/><code>ocr.py</code>"]
+            R_EVID["/evidence<br/><code>evidence.py</code>"]
+            R_REPORTS["/reports<br/><code>reports.py</code>"]
+            R_SEARCH["/search<br/><code>search.py</code>"]
+            R_SITES["/sites<br/><code>sites.py</code>"]
+            R_JOURNEYS["/journeys<br/><code>journeys.py</code>"]
+            R_PHOTO["/photogrammetry<br/><code>photogrammetry.py</code>"]
+        end
+    end
+
+    subgraph PIPELINE_LAYER["4. Ingestion, OCR & AI Processing Pipeline"]
+        direction TB
+        subgraph INGEST_SERVICES["Multi-Format Parsers"]
+            P_PDF["📄 PDF Parser (pypdf)"]
+            P_PPTX["📊 PPTX Parser (python-pptx)"]
+            P_DOCX["📝 DOCX Parser (python-docx)"]
+            P_IMG["🖼️ Image Parser (EXIF GPS / PIL)"]
+            P_ZIP["📦 ZipSlip Validator"]
+            P_HASH["🔑 SHA-256 Hasher"]
+        end
+
+        subgraph OCR_SERVICES["OCR & Translation Engine"]
+            OCR_FACTORY["🏭 OCR Engine Factory"]
+            OCR_TESS["🔎 Tesseract OCR"]
+            OCR_VISION["👁️ Vision Transformer"]
+            TRANSLATOR["🌐 Indic Translator (Guj/Dev)"]
+        end
+
+        subgraph RAG_SERVICES["Semantic Retrieval & Q&A Engine"]
+            EMBED["📐 128-Dim Dense Embeddings"]
+            RETRIEVER["🎯 Hybrid Vector-Lexical Retriever"]
+            QA_ENGINE["🤖 Grounded Q&A Synthesizer (0.35 Threshold)"]
+        end
+
+        subgraph AUDIT_SERVICES["Analysis & Dossier Generators"]
+            GAP_ANALYSIS["📈 7-Category Gap Analysis"]
+            REPORT_GEN["📑 ReportLab PDF Generator"]
+        end
+    end
+
+    subgraph DATA_LAYER["5. Database & Storage Layer"]
+        direction TB
+        SQLA_ENGINE["⚙️ SQLAlchemy 2.0 Engine"]
+        
+        subgraph RELATIONAL_DB["Relational Schema (SQLite / PostgreSQL)"]
+            T_USERS[("users")]
+            T_DOCS[("documents")]
+            T_JOBS[("processing_jobs")]
+            T_EVID[("evidence_records")]
+            T_SITES[("heritage_sites")]
+            T_MEDIA[("site_media")]
+            T_CHECK[("checklist_items")]
+            T_AUDIT[("audit_logs")]
+            T_JOURN[("heritage_journeys")]
+            T_STOPS[("heritage_journey_stops")]
+        end
+
+        subgraph FILE_STORAGE["Filesystem Storage (/tmp Fallback)"]
+            FS_UPLOADS["📁 uploads/"]
+            FS_REPORTS["📁 reports/"]
+        end
+    end
+
+    subgraph GUARDRAILS_LAYER["6. Security & Integrity Guardrails"]
+        G_HUMAN["🛑 Human-Only Verification Rule<br/><i>AI cannot certify claims</i>"]
+        G_INTEGRITY["🔐 Cryptographic Deduplication<br/><i>SHA-256 Provenance Fingerprint</i>"]
+        G_DISCLAIMER["⚠️ Conservation Safety Disclaimer<br/><i>Archival Metric ≠ Structural Safety</i>"]
+        G_REFUSAL["🚫 Anti-Hallucination Fallback<br/><i>Strict Refusal when Score < 0.35</i>"]
+    end
+
+    subgraph DEPLOY_LAYER["7. Hosting & Infrastructure"]
+        V_FE["☁️ Vercel Edge Frontend (hackcult-five.vercel.app)"]
+        V_BE["⚡ Vercel Serverless / AWS Lambda (/api/index.py)"]
+        GH_REPO["🐙 GitHub Repository (shivam-raj4102006/HACKCULT)"]
+    end
+
+    CLIENT_LAYER --> FRONTEND_LAYER
+    NAV --> FE_MODULES
+    FE_MODULES --> API_CLIENT
+    API_CLIENT -.-> DEMO_STORE
+    API_CLIENT ==> FASTAPI_CORE
+    FASTAPI_CORE --> CORS_MW
+    CORS_MW --> AUTH_MW
+    AUTH_MW --> ROUTERS
+    R_DOCS --> INGEST_SERVICES
+    R_OCR --> OCR_SERVICES
+    R_SEARCH --> RAG_SERVICES
+    R_EVID --> GAP_ANALYSIS
+    R_REPORTS --> REPORT_GEN
+    R_SITES & R_JOURNEYS --> SQLA_ENGINE
+    INGEST_SERVICES --> P_HASH
+    P_HASH --> FS_UPLOADS
+    REPORT_GEN --> FS_REPORTS
+    ROUTERS ==> SQLA_ENGINE
+    SQLA_ENGINE ==> RELATIONAL_DB
+    R_EVID -.-> G_HUMAN
+    GAP_ANALYSIS -.-> G_DISCLAIMER
+    QA_ENGINE -.-> G_REFUSAL
+    FRONTEND_LAYER -.-> V_FE
+    API_LAYER -.-> V_BE
+    GH_REPO -.-> V_FE
+    GH_REPO -.-> V_BE
+          </div>
+        </div>
+
+        <div class="legend-bar">
+          <div class="legend-item"><div class="legend-bullet" style="background: #14B8A6;"></div><span>Implemented & Verified Backend/Frontend Core</span></div>
+          <div class="legend-item"><div class="legend-bullet" style="background: #F59E0B;"></div><span>Interactive Client-Side Demo Fallback (Offline Mode)</span></div>
+          <div class="legend-item"><div class="legend-bullet" style="background: #38BDF8;"></div><span>Planned / Cloud Production Extension (Neon Postgres, S3)</span></div>
+        </div>
+      </div>
+
+      <!-- System Architecture Notes -->
+      <div class="notes-grid">
+        <div class="note-box">
+          <h4>🏛️ 1. Multi-Format Archival Ingestion</h4>
+          <p>The system ingests architectural documentation from multiple formats: <strong>PDF</strong> (via pypdf), <strong>PPTX</strong> with speaker notes (via python-pptx), <strong>DOCX</strong> field notes, <strong>JPG/PNG</strong> with EXIF GPS coordinates, and <strong>ZIP</strong> archives protected with ZipSlip traversal security.</p>
+        </div>
+        <div class="note-box">
+          <h4>🛑 2. Human-Only Verification Mandate</h4>
+          <p>By architectural mandate, <strong>AI models can extract claims but can NEVER mark them as verified</strong>. Only human researchers or verifiers with verified RBAC credentials can certify historical facts with immutable cryptographic audit logging.</p>
+        </div>
+        <div class="note-box">
+          <h4>📐 3. Dense Embeddings & Grounded RAG</h4>
+          <p>Features 128-dimensional normalized dense text embeddings capturing Indic morphology and character n-grams. The hybrid retrieval engine scores 60% semantic cosine similarity and 40% lexical overlap, strictly refusing out-of-scope queries below threshold 0.35.</p>
+        </div>
+        <div class="note-box">
+          <h4>📑 4. ReportLab PDF Dossier Generation</h4>
+          <p>Compiles verified claims, 7-category archival completeness scores, gap remediation tasks, and UNESCO citations into standardized multi-page downloadable PDF dossiers using ReportLab.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: DATA FLOW -->
+    <div id="tab-dataflow" class="diagram-panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🔄 End-to-End Data Flow (4 Execution Pipelines)</span>
+          </div>
+          <div class="controls">
+            <button class="btn-tool" onclick="copyMermaid('mermaid-dataflow')">📋 Copy Mermaid</button>
+            <button class="btn-tool" onclick="toggleFullscreen('tab-dataflow')">⛶ Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="diagram-viewport">
+          <div id="mermaid-dataflow" class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as 👤 User / Researcher
+    participant FE as 🖥️ React Frontend
+    participant API as ⚡ FastAPI (/api/v1)
+    participant Worker as ⚙️ Ingestion & RAG Worker
+    participant DB as 🗄️ Database (SQLAlchemy)
+    participant FS as 📁 Storage (/tmp/storage)
+
+    rect rgb(15, 23, 42)
+        note over User, FS: Pipeline 1: Ingestion & Cryptographic Provenance
+        User->>FE: Drop file (PDF, PPTX, DOCX, ZIP) into IngestionView
+        FE->>API: POST /api/v1/documents/upload (multipart)
+        API->>Worker: Compute SHA-256 fingerprint & validate
+        alt Unique Document
+            Worker->>FS: Store in storage/uploads/{sha256}.{ext}
+            Worker->>DB: Insert Document (status="QUEUED") & ProcessingJob
+            Worker->>Worker: Parse text, notes, EXIF GPS & create EvidenceRecords
+            Worker->>DB: Update Document status="processed"
+            API-->>FE: HTTP 201 Created (Document details & SHA-256)
+        end
+    end
+
+    rect rgb(19, 42, 60)
+        note over User, FS: Pipeline 2: Grounded Q&A & Anti-Hallucination Refusal
+        User->>FE: Enter natural language query in GroundedQA
+        FE->>API: POST /api/v1/search/qa { query, only_verified }
+        API->>Worker: generate_text_embedding(query) [128-dim dense vector]
+        Worker->>DB: Retrieve candidate EvidenceRecords
+        Worker->>Worker: Hybrid Score = (0.60 * CosineSim) + (0.40 * KeywordOverlap)
+        alt Score >= 0.35 (Supporting Evidence Found)
+            Worker-->>API: status="GROUNDED_ANSWER" with exact page/slide citations
+            API-->>FE: HTTP 200 OK with citations & snippet provenance
+        else Score < 0.35 (Insufficient Archival Evidence)
+            Worker-->>API: status="INSUFFICIENT_EVIDENCE" (Strict refusal)
+            API-->>FE: HTTP 200 OK (Refusal message, no false claims)
+        end
+    end
+
+    rect rgb(28, 25, 23)
+        note over User, FS: Pipeline 3: Human Verification Lifecycle & Audit Log
+        User->>FE: Verifier audits claim in VerificationPortal and clicks "Verify"
+        FE->>API: POST /api/v1/evidence/review { evidence_id, status: "verified" }
+        API->>DB: Update EvidenceRecord (verification_status="verified", verified_by=User.id)
+        API->>DB: Insert AuditLog { action: "EVIDENCE_VERIFIED", entity_id, timestamp }
+        API->>Worker: compute_gap_analysis(site_id)
+        Worker->>DB: Update HeritageSite.completeness_score
+        API-->>FE: HTTP 200 OK (Updated status & new completeness %)
+    end
+
+    rect rgb(30, 41, 59)
+        note over User, FS: Pipeline 4: ReportLab PDF Dossier Export
+        User->>FE: Clicks "Download PDF Dossier Report"
+        FE->>API: GET /api/v1/reports/site/{site_id}/download-direct
+        API->>Worker: generate_pdf_dossier(site_id, db)
+        Worker->>FS: Render ReportLab PDF with tables, score badge & disclaimer
+        API-->>FE: HTTP 200 FileResponse (application/pdf attachment)
+        FE-->>User: Instant certified archival PDF download
+    end
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-box">
+          <h4>🔄 Ingestion Provenance Flow</h4>
+          <p>Every document is hashed with SHA-256 before extraction. If a duplicate file is uploaded, the existing record is returned without re-processing, preventing archival clutter and wasted computation.</p>
+        </div>
+        <div class="note-box">
+          <h4>🎯 Anti-Hallucination Guardrail</h4>
+          <p>Unlike conventional conversational LLMs that fabricate answers when context is missing, HeritageProof evaluates evidence chunks against a strict 0.35 threshold. If evidence is lacking, it explicitly returns <code>INSUFFICIENT_EVIDENCE</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: DATABASE ER -->
+    <div id="tab-er" class="diagram-panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🗄️ Relational Database Schema (SQLAlchemy Models)</span>
+          </div>
+          <div class="controls">
+            <button class="btn-tool" onclick="copyMermaid('mermaid-er')">📋 Copy Mermaid</button>
+            <button class="btn-tool" onclick="toggleFullscreen('tab-er')">⛶ Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="diagram-viewport">
+          <div id="mermaid-er" class="mermaid">
+erDiagram
+    USERS ||--o{ EVIDENCE_RECORDS : "verifies"
+    USERS ||--o{ AUDIT_LOGS : "triggers"
+    DOCUMENTS ||--o{ PROCESSING_JOBS : "owns"
+    DOCUMENTS ||--o{ EVIDENCE_RECORDS : "extracts_into"
+    HERITAGE_SITES ||--o{ EVIDENCE_RECORDS : "references"
+    HERITAGE_SITES ||--o{ SITE_MEDIA : "contains"
+    HERITAGE_SITES ||--o{ CHECKLIST_ITEMS : "scored_by"
+    HERITAGE_SITES ||--o{ HERITAGE_JOURNEY_STOPS : "associated_with"
+    EVIDENCE_RECORDS ||--o{ CHECKLIST_ITEMS : "fulfills"
+    HERITAGE_JOURNEYS ||--o{ HERITAGE_JOURNEY_STOPS : "consists_of"
+
+    USERS {
+        string id PK
+        string username UK
+        string email UK
+        string hashed_password
+        string role
+        string organization
+        boolean is_active
+        datetime created_at
+    }
+
+    DOCUMENTS {
+        string id PK
+        string original_filename
+        string storage_path
+        string mime_type
+        integer file_size
+        string sha256_hash UK
+        string status
+        integer retry_count
+        integer total_pages_or_slides
+        json file_metadata
+        datetime created_at
+    }
+
+    PROCESSING_JOBS {
+        string id PK
+        string document_id FK
+        string stage
+        string status
+        integer attempt
+        text error_traceback
+        datetime started_at
+        datetime completed_at
+    }
+
+    HERITAGE_SITES {
+        string id PK
+        string name
+        string site_type
+        string historical_period
+        float latitude
+        float longitude
+        string city
+        string state
+        string model_3d_url
+        float completeness_score
+        datetime created_at
+    }
+
+    SITE_MEDIA {
+        string id PK
+        string site_id FK
+        string media_type
+        string file_url
+        string caption
+        boolean is_primary
+    }
+
+    EVIDENCE_RECORDS {
+        string id PK
+        string document_id FK
+        string site_id FK
+        integer page_or_slide_number
+        text raw_extracted_text
+        text original_text
+        text ocr_extracted_text
+        text english_translation
+        string ocr_engine
+        boolean is_corrected
+        text claim_statement
+        float extraction_confidence
+        string verification_status
+        string verified_by FK
+        datetime verified_at
+        text verification_notes
+    }
+
+    CHECKLIST_ITEMS {
+        string id PK
+        string site_id FK
+        string category
+        string item_name
+        boolean is_fulfilled
+        string evidence_id FK
+        text gap_description
+    }
+
+    AUDIT_LOGS {
+        string id PK
+        string user_id FK
+        string action
+        string entity_name
+        string entity_id
+        json details
+        datetime created_at
+    }
+
+    HERITAGE_JOURNEYS {
+        string id PK
+        string title
+        text description
+        string region
+        string era
+        string estimated_duration
+    }
+
+    HERITAGE_JOURNEY_STOPS {
+        string id PK
+        string journey_id FK
+        string site_id FK
+        integer stop_order
+        string title
+        text folklore_narrative
+        text architectural_observation
+        float latitude
+        float longitude
+    }
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-box">
+          <h4>🗄️ Relational Integrity & Cascades</h4>
+          <p>All tables inherit UUID primary keys and UTC audit timestamps from <code>BaseModelMixin</code>. Child tables (<code>processing_jobs</code>, <code>site_media</code>, <code>checklist_items</code>) enforce <code>ON DELETE CASCADE</code>, while evidence verifier links use <code>ON DELETE SET NULL</code> to preserve archival history.</p>
+        </div>
+        <div class="note-box">
+          <h4>📊 7-Category Completeness Checklist</h4>
+          <p>The <code>checklist_items</code> table tracks archival coverage across: <code>location</code>, <code>construction_date</code>, <code>elevations</code>, <code>materials</code>, <code>features</code>, <code>condition</code>, and <code>drawings</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: DEPLOYMENT TOPOLOGY -->
+    <div id="tab-deploy" class="diagram-panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🚀 Hybrid Cloud & Serverless Deployment Topology</span>
+          </div>
+          <div class="controls">
+            <button class="btn-tool" onclick="copyMermaid('mermaid-deploy')">📋 Copy Mermaid</button>
+            <button class="btn-tool" onclick="toggleFullscreen('tab-deploy')">⛶ Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="diagram-viewport">
+          <div id="mermaid-deploy" class="mermaid">
+graph TB
+    subgraph DEV_ENV["Local Workstation Environment"]
+        DEV_GIT["🔧 Git CLI & GitHub Desktop"]
+        DEV_VITE["⚡ Vite Dev Server (port 5173)"]
+        DEV_FASTAPI["🐍 FastAPI Dev Server (port 8000)"]
+        DEV_SQLITE[("📁 heritageproof.db (Local)")]
+    end
+
+    subgraph SCM["GitHub Repository"]
+        GH_REPO["🐙 https://github.com/shivam-raj4102006/HACKCULT<br/><i>Branch: main</i>"]
+    end
+
+    subgraph VERCEL_CLOUD["Vercel Cloud Platform"]
+        subgraph VERCEL_FE["Frontend Edge Project ('hackcult')"]
+            V_ROUTER["🌐 Vercel Edge CDN<br/><code>https://hackcult-five.vercel.app</code>"]
+            V_SPA_REWRITE["🔀 SPA Rewrite Engine<br/><code>frontend/vercel.json</code>"]
+            V_STATIC["📦 Vite SPA Static Bundle (dist/)"]
+        end
+
+        subgraph VERCEL_BE["Serverless Python Runtime"]
+            V_ENTRY["⚡ ASGI Bridge (api/index.py)"]
+            V_APP["🐍 FastAPI Core (app/main.py)"]
+            V_TMP["💾 Ephemeral Storage (/tmp)"]
+        end
+
+        subgraph VERCEL_ENV["Configuration"]
+            ENV_VARS["⚙️ VERCEL=1 • SECRET_KEY • DATABASE_URL"]
+        end
+    end
+
+    subgraph EXTERNAL["External Integrations"]
+        EXT_OSM["🗺️ OpenStreetMap / Leaflet (WGS 84 Tiles)"]
+        EXT_UNSPLASH["🖼️ Unsplash CDN (Field Photos)"]
+        EXT_POSTGRES[("🐘 Optional PostgreSQL (Neon / Supabase)<br/><i>[Production Extension]</i>")]
+    end
+
+    DEV_GIT -->|git push origin main| GH_REPO
+    DEV_VITE -.->|/api proxy| DEV_FASTAPI
+    DEV_FASTAPI --> DEV_SQLITE
+    GH_REPO ==>|Auto CI/CD Webhook| VERCEL_FE
+    GH_REPO ==>|Auto CI/CD Webhook| VERCEL_BE
+    V_ROUTER --> V_SPA_REWRITE
+    V_SPA_REWRITE --> V_STATIC
+    V_ROUTER -.->|/api/(.*) rewrites| V_ENTRY
+    V_ENTRY --> V_APP
+    V_APP --> V_TMP
+    ENV_VARS -.-> V_APP
+    V_APP -.-> EXT_POSTGRES
+    V_STATIC --> EXT_OSM & EXT_UNSPLASH
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-grid">
+        <div class="note-box">
+          <h4>⚡ Serverless /tmp Adaptation</h4>
+          <p>On AWS Lambda / Vercel, the code root (<code>/var/task</code>) is strictly read-only. HeritageProof dynamically routes SQLite, temporary uploads, and generated PDF dossiers to <code>/tmp</code>, guaranteeing zero cold-start filesystem crashes.</p>
+        </div>
+        <div class="note-box">
+          <h4>🔀 Zero-Config SPA Routing</h4>
+          <p>Configured <code>frontend/vercel.json</code> ensures that deep links and browser refreshes on any tab (e.g. <code>/verification</code>, <code>/map</code>) rewrite to <code>/index.html</code>, eliminating 404 routing errors.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: PRESENTATION PITCH -->
+    <div id="tab-speech" class="diagram-panel">
+      <div class="speech-box">
+        <h3>🎙️ 2-Minute Elevator Pitch (English)</h3>
+        <p class="text-muted">Use this concise, high-impact script for judges during the initial project demonstration.</p>
+        <div class="speech-script">
+          "Good morning, judges! Today we present <strong>HeritageProof</strong> — a digital archival verification, spatial provenance, and multimodal exploration platform designed for historical monuments, starting with the medieval heritage of Gujarat.<br><br>
+          Historical preservation faces three critical challenges: <em>unverified claims</em>, <em>fragmented multi-format archives</em>, and <em>AI hallucinations</em>. HeritageProof addresses these through a strict 7-layer architecture.<br><br>
+          First, our <strong>Ingestion Pipeline</strong> handles multi-format files — PDFs, presentation decks with speaker notes, DOCX field reports, and EXIF GPS photos — stamping each with a cryptographic SHA-256 hash for tamper-evident provenance.<br><br>
+          Second, our <strong>Human-Only Verification Mandate</strong> ensures that while AI extracts claims and translates Devanagari or Gujarati scripts, <em>only human researchers can certify historical facts</em> with immutable audit logging.<br><br>
+          Third, our <strong>Grounded Retrieval-Augmented Generation (RAG)</strong> engine uses 128-dimensional dense embeddings to anchor queries to exact page and slide citations. If an archival citation does not exist, the engine strictly refuses to hallucinate.<br><br>
+          Finally, our <strong>Spatial & Photogrammetric Engine</strong> projects monuments onto an interactive WGS 84 Gujarat map and renders Three.js 3D models with anchored evidence hotspots, while our ReportLab engine generates certified, multi-page PDF dossiers on demand.<br><br>
+          With HeritageProof, cultural heritage is not merely digitized — it is authenticated, preserved, and brought to life."
+        </div>
+      </div>
+
+      <div class="speech-box">
+        <h3>🎙️ 2-Minute Presentation Pitch (Hinglish)</h3>
+        <p class="text-muted">Use this natural, fluent bilingual script for Indian hackathons, tech fests, or conversational presentations.</p>
+        <div class="speech-script hinglish">
+          "Namaste judges! Aaj hum present kar rahe hain <strong>HeritageProof</strong> — ek robust digital platform jo hamare historical monuments ke archival records ko authenticate karta hai aur unhe interactive 3D aur geospatial maps ke zariye explore karne deta hai.<br><br>
+          Problem yeh hai ki internet par historical facts aksar distorted hote hain, aur AI models bina evidence ke fake stories hallucinate kar dete hain. Isko solve karne ke liye humne ek comprehensive 7-layer architecture banaya hai.<br><br>
+          Sabse pehle, hamara <strong>Ingestion System</strong> multi-format documents accept karta hai — jaise ASI ke survey PDFs, field reports, EXIF GPS photos aur ZIP bundles. Har document ko ek unique <strong>SHA-256 cryptographic hash</strong> diya jata hai taaki record immutable aur tamper-evident rahe.<br><br>
+          Dusra aur sabse important rule: <strong>Human-Only Verification</strong>. Hamara AI Devanagari aur Gujarati inscriptions ko extract aur translate zaroor karta hai, lekin <em>claim ko verify sirf verified human researchers hi kar sakte hain</em> audit logging ke saath.<br><br>
+          Teesra, hamara <strong>Grounded RAG Search</strong>: Jab user koi sawal poochta hai, system 128-dimensional dense embeddings se exact page number aur snippet cite karta hai. Agar archive mein answer nahi hai, toh model guess karne ke bajaye cleanly refuse kar deta hai — zero hallucination.<br><br>
+          Lastly, hamare paas <strong>Interactive Gujarat Map</strong>, <strong>Three.js 3D Photogrammetry Viewer</strong>, aur instant <strong>PDF Dossier Generator</strong> hai. Toh chahe researcher ho ya tourist, HeritageProof guarantees complete provenance and scientific verification."
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <span>HeritageProof Core Architecture Suite • IIT Gandhinagar Blithchron '27 (HC26-CULT01)</span>
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#0B1120',
+        primaryColor: '#0E2238',
+        primaryBorderColor: '#14B8A6',
+        primaryTextColor: '#F1F5F9',
+        lineColor: '#38BDF8',
+        secondaryColor: '#1E1B4B',
+        tertiaryColor: '#182234',
+        fontFamily: 'Plus Jakarta Sans, sans-serif',
+        fontSize: '13px'
+      },
+      flowchart: { curve: 'basis', htmlLabels: true },
+      sequence: { actorFontSize: 13, noteFontSize: 12, messageFontSize: 12 }
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.diagram-panel').forEach(p => p.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    function toggleFullscreen(elemId) {
+      const elem = document.getElementById(elemId);
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => alert("Fullscreen error: " + err.message));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function copyMermaid(containerId) {
+      const text = document.getElementById(containerId).textContent.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Mermaid diagram source copied to clipboard!");
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+erDiagram
+    %% =====================================================================
+    %% HERITAGEPROOF — DATABASE ENTITY-RELATIONSHIP (ER) DIAGRAM
+    %% Exactly mapped from SQLAlchemy Models (backend/app/models/*.py)
+    %% =====================================================================
+
+    USERS ||--o{ EVIDENCE_RECORDS : "verifies"
+    USERS ||--o{ AUDIT_LOGS : "triggers"
+    DOCUMENTS ||--o{ PROCESSING_JOBS : "owns"
+    DOCUMENTS ||--o{ EVIDENCE_RECORDS : "extracts_into"
+    HERITAGE_SITES ||--o{ EVIDENCE_RECORDS : "references"
+    HERITAGE_SITES ||--o{ SITE_MEDIA : "contains"
+    HERITAGE_SITES ||--o{ CHECKLIST_ITEMS : "scored_by"
+    HERITAGE_SITES ||--o{ HERITAGE_JOURNEY_STOPS : "associated_with"
+    EVIDENCE_RECORDS ||--o{ CHECKLIST_ITEMS : "fulfills"
+    HERITAGE_JOURNEYS ||--o{ HERITAGE_JOURNEY_STOPS : "consists_of"
+
+    USERS {
+        string id PK "UUID (String 36)"
+        string username UK "Unique username (index)"
+        string email UK "Unique email (index)"
+        string hashed_password "Bcrypt hash"
+        string role "admin | researcher | verifier | viewer"
+        string organization "Organization label"
+        boolean is_active "Account status flag"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    DOCUMENTS {
+        string id PK "UUID (String 36)"
+        string original_filename "Uploaded archival file name"
+        string storage_path "Filesystem absolute/relative path"
+        string mime_type "application/pdf, zip, docx, etc."
+        integer file_size "File size in bytes"
+        string sha256_hash UK "Cryptographic SHA-256 (unique index)"
+        string status "QUEUED | PROCESSING | COMPLETED | FAILED"
+        integer retry_count "Current retry attempts"
+        integer max_retries "Default: 3"
+        text error_message "Failure explanation if failed"
+        integer total_pages_or_slides "Total units extracted"
+        json file_metadata "EXIF, author, title, extracted details"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    PROCESSING_JOBS {
+        string id PK "UUID (String 36)"
+        string document_id FK "References documents.id (CASCADE)"
+        string stage "UNPACKING | PARSING | OCR | CHUNKING | INDEXING"
+        string status "QUEUED | RUNNING | COMPLETED | FAILED | RETRYING"
+        integer attempt "Execution attempt count"
+        text error_traceback "Captured stack trace on failure"
+        datetime started_at "Job start timestamp"
+        datetime completed_at "Job completion timestamp"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    HERITAGE_SITES {
+        string id PK "UUID (String 36)"
+        string name "Monument canonical name (index)"
+        string alternate_names "Folklore / regional aliases"
+        string site_type "stepwell | temple | fort | monument"
+        string historical_period "Solanki, Vaghela, Maurya, etc."
+        float latitude "WGS 84 latitude coordinate"
+        float longitude "WGS 84 longitude coordinate"
+        string city "City / Tehsil"
+        string state "Default: Gujarat"
+        string country "Default: India"
+        text summary "Architectural & cultural overview"
+        string model_3d_url "Path to GLB 3D model asset"
+        float completeness_score "0.0 - 100.0% archival metric"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    SITE_MEDIA {
+        string id PK "UUID (String 36)"
+        string site_id FK "References heritage_sites.id (CASCADE)"
+        string media_type "IMAGE | 3D_MODEL_GLB"
+        string file_url "Asset URL or local static path"
+        string caption "Descriptive caption / credit"
+        boolean is_primary "Hero asset display flag"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    EVIDENCE_RECORDS {
+        string id PK "UUID (String 36)"
+        string document_id FK "References documents.id (CASCADE)"
+        string site_id FK "References heritage_sites.id (SET NULL)"
+        integer page_or_slide_number "Page/slide citation anchor"
+        integer chunk_index "Text chunk sequential index"
+        text raw_extracted_text "Unprocessed archival chunk text"
+        text original_text "Historical Gujarati/Devanagari script"
+        text ocr_extracted_text "OCR engine transcript"
+        text english_translation "Scholarly English translation"
+        string ocr_engine "tesseract | vision_transformer"
+        boolean is_corrected "True if human researcher edited text"
+        text claim_statement "Formal historical claim statement"
+        float extraction_confidence "OCR/NER confidence metric"
+        json bounding_box "Spatial OCR coordinate box"
+        string verification_status "unverified | reviewed | verified | rejected"
+        string verified_by FK "References users.id (SET NULL)"
+        datetime verified_at "Immutable verification timestamp"
+        text verification_notes "Human auditor certification notes"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    CHECKLIST_ITEMS {
+        string id PK "UUID (String 36)"
+        string site_id FK "References heritage_sites.id (CASCADE)"
+        string category "location | construction_date | elevations | materials | features | condition | drawings"
+        string item_name "Requirement descriptor"
+        boolean is_fulfilled "Coverage fulfillment flag"
+        string evidence_id FK "References evidence_records.id (SET NULL)"
+        text gap_description "Actionable missing documentation note"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    AUDIT_LOGS {
+        string id PK "UUID (String 36)"
+        string user_id FK "References users.id (SET NULL)"
+        string action "EVIDENCE_VERIFIED | CLAIM_REJECTED | OCR_CORRECTED"
+        string entity_name "Table or resource name"
+        string entity_id "Target record primary key"
+        json details "Before/after state, notes, IP/role context"
+        datetime created_at "UTC timestamp"
+        datetime updated_at "UTC timestamp"
+    }
+
+    HERITAGE_JOURNEYS {
+        string id PK "UUID (String 36)"
+        string title "Circuit name (e.g., Solanki Royal Trail)"
+        text description "Thematic narrative overview"
+        string region "Geographic corridor (e.g., Northern Gujarat)"
+        string era "Historical epoch (e.g., Medieval Solanki)"
+        string estimated_duration "Recommended duration (e.g., 2 Days)"
+        datetime created_at "UTC timestamp"
+    }
+
+    HERITAGE_JOURNEY_STOPS {
+        string id PK "UUID (String 36)"
+        string journey_id FK "References heritage_journeys.id (CASCADE)"
+        string site_id FK "References heritage_sites.id (SET NULL)"
+        integer stop_order "Sequential order along route (1, 2, ...)"
+        string title "Stop heading"
+        text folklore_narrative "Oral legend / intangible cultural lore"
+        text architectural_observation "Field observation & structural highlights"
+        string photo_url "Field photo asset URL"
+        float latitude "Stop WGS 84 latitude"
+        float longitude "Stop WGS 84 longitude"
+    }

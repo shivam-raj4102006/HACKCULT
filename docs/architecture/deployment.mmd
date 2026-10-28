@@ -1,0 +1,74 @@
+graph TB
+%% =====================================================================
+%% HERITAGEPROOF — DEPLOYMENT ARCHITECTURE DIAGRAM
+%% Topology: Local Dev, GitHub, Vercel Edge & Serverless, DB Storage
+%% =====================================================================
+
+    subgraph DEV_ENV["Local Development Environment (Workstation)"]
+        DEV_USER["👨‍💻 Developer / Contributor"]
+        DEV_GIT["🔧 Git CLI & GitHub Desktop<br/><i>(Author: Shivam Raj)</i>"]
+        DEV_VITE["⚡ Vite Frontend Dev Server<br/><code>http://127.0.0.1:5173</code>"]
+        DEV_FASTAPI["🐍 FastAPI Uvicorn Dev Server<br/><code>http://127.0.0.1:8000</code>"]
+        DEV_SQLITE[("📁 Local SQLite Database<br/><code>heritageproof.db</code>")]
+        DEV_STORAGE["📁 Local Storage Dir<br/><code>storage/uploads & reports</code>"]
+    end
+
+    subgraph SCM["Source Control Management (Cloud)"]
+        GH_REPO["🐙 GitHub Remote Repository<br/><code>https://github.com/shivam-raj4102006/HACKCULT</code><br/><i>Branch: main</i>"]
+    end
+
+    subgraph VERCEL_CLOUD["Vercel Cloud Platform (Global Edge Network)"]
+        direction TB
+        
+        subgraph VERCEL_FE["Frontend Edge Project ('hackcult')"]
+            V_ROUTER["🌐 Vercel Global Edge CDN<br/><code>https://hackcult-five.vercel.app</code>"]
+            V_SPA_REWRITE["🔀 SPA Routing Engine<br/><code>frontend/vercel.json</code> • <i>/(.*) -> /index.html</i>"]
+            V_STATIC["📦 Static Assets Bundle<br/><code>dist/index.html</code>, <code>dist/assets/*</code>"]
+        end
+
+        subgraph VERCEL_BE["Serverless Python Runtime (Lambda Container)"]
+            V_ENTRY["⚡ Serverless Entrypoint<br/><code>api/index.py</code> • <i>ASGI Bridge</i>"]
+            V_APP["🐍 FastAPI Application<br/><code>backend/app/main.py</code> • <i>Python 3.10-3.12</i>"]
+            V_TMP_STORAGE["💾 Ephemeral Container Storage (/tmp)<br/>• <code>/tmp/heritageproof.db</code><br/>• <code>/tmp/storage/uploads/</code><br/>• <code>/tmp/storage/reports/</code>"]
+        end
+
+        subgraph VERCEL_ENV_VARS["Environment & Configuration"]
+            ENV_CONFIG["⚙️ Environment Variables<br/>• <code>VERCEL=1</code><br/>• <code>SECRET_KEY</code> (JWT)<br/>• <code>DATABASE_URL</code> (SQLite / Postgres)<br/>• <code>BACKEND_CORS_ORIGINS</code>"]
+        end
+    end
+
+    subgraph EXTERNAL_SERVICES["External Integrations & CDN Dependencies"]
+        EXT_OSM["🗺️ OpenStreetMap / Leaflet CDN<br/><i>(WGS 84 Cartographic Map Tiles)</i>"]
+        EXT_UNSPLASH["🖼️ Unsplash Image CDN<br/><i>(Field Monument Architectural Photos)</i>"]
+        EXT_POSTGRES[("🐘 Optional Persistent PostgreSQL<br/><i>(e.g., Neon / Supabase / AWS RDS)</i><br/><code>DATABASE_URL=postgresql://...</code><br/><i>[Planned / Production Extension]</i>")]
+    end
+
+    %% Connections
+    DEV_USER -->|Code / Edits| DEV_GIT
+    DEV_GIT -->|git push origin main| GH_REPO
+    DEV_VITE -.->|Local Proxy: /api| DEV_FASTAPI
+    DEV_FASTAPI --> DEV_SQLITE
+    DEV_FASTAPI --> DEV_STORAGE
+
+    GH_REPO ==>|Auto CI/CD Webhook on push| VERCEL_FE
+    GH_REPO ==>|Auto CI/CD Webhook on push| VERCEL_BE
+
+    V_ROUTER --> V_SPA_REWRITE
+    V_SPA_REWRITE --> V_STATIC
+    V_STATIC -.->|Client-Side Fallback Mode| V_STATIC
+
+    V_ROUTER -.->|Rewrites: /api/(.*)| V_ENTRY
+    V_ENTRY --> V_APP
+    V_APP --> V_TMP_STORAGE
+    ENV_CONFIG -.->|Injected into Process Env| V_APP
+    V_APP -.->|If DATABASE_URL set| EXT_POSTGRES
+
+    V_STATIC -->|Tile Requests| EXT_OSM
+    V_STATIC -->|Image Requests| EXT_UNSPLASH
+
+    %% Legend Subgraph
+    subgraph LEGEND["Legend & Implementation Status"]
+        L1["🟩 Implemented & Verified in Repository"]
+        L2["🟨 Client-Side Interactive Demo Fallback"]
+        L3["🟦 Planned Production Cloud Extension"]
+    end

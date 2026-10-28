@@ -1,0 +1,96 @@
+sequenceDiagram
+    autonumber
+    %% =====================================================================
+    %% HERITAGEPROOF — END-TO-END DATA FLOW DIAGRAMS
+    %% Covers: 1. Ingestion & Provenance 2. Grounded Q&A Search
+    %% 3. Human Verification Lifecycle 4. ReportLab PDF Dossier Export
+    %% =====================================================================
+
+    actor User as 👤 User / Researcher
+    participant FE as 🖥️ React Frontend (Vite)
+    participant API as ⚡ FastAPI Backend (/api/v1)
+    participant Worker as ⚙️ Ingestion / AI Worker
+    participant DB as 🗄️ Relational DB (SQLAlchemy)
+    participant FS as 📁 Storage (Local / /tmp)
+
+    %% -------------------------------------------------------------
+    %% FLOW 1: DOCUMENT INGESTION & SHA-256 PROVENANCE PIPELINE
+    %% -------------------------------------------------------------
+    rect rgb(15, 23, 42)
+        note over User, FS: Flow 1: Multi-Format Document Ingestion & Cryptographic Provenance
+        User->>FE: Drop file (PDF, PPTX, DOCX, ZIP, JPG) into IngestionView
+        FE->>API: POST /api/v1/documents/upload (multipart/form-data)
+        API->>Worker: validate_upload(file, content) & compute_sha256(content)
+        alt Duplicate Document Detected
+            Worker->>DB: Query Document by sha256_hash
+            DB-->>API: Existing Document record
+            API-->>FE: HTTP 200 OK (Existing document metadata)
+        else New Unique Document
+            Worker->>FS: Write binary to storage/uploads/{sha256}.{ext}
+            Worker->>DB: Insert Document (status="QUEUED", sha256_hash)
+            Worker->>DB: Insert ProcessingJob (stage="PARSING", status="QUEUED")
+            API-->>FE: HTTP 201 Created (DocumentResponse)
+            note over Worker, DB: Asynchronous Ingestion Pipeline Execution
+            Worker->>Worker: Parse text, notes, EXIF GPS (pypdf / python-pptx / PIL)
+            Worker->>DB: Extract text chunks & save EvidenceRecords (status="unverified")
+            Worker->>DB: Update ProcessingJob & Document status="processed"
+            FE->>API: GET /api/v1/documents (Polling status)
+            API-->>FE: Ingested documents list with SHA-256 provenance badges
+        end
+    end
+
+    %% -------------------------------------------------------------
+    %% FLOW 2: GROUNDED RAG SEARCH & ANTI-HALLUCINATION REFUSAL
+    %% -------------------------------------------------------------
+    rect rgb(19, 42, 60)
+        note over User, FS: Flow 2: Semantic Evidence-Grounded Q&A & Refusal Fallback
+        User->>FE: Types query into GroundedQA (e.g. "Who commissioned Rani Ki Vav?")
+        FE->>API: POST /api/v1/search/qa { query, only_verified }
+        API->>Worker: answer_heritage_query(query, db)
+        Worker->>Worker: generate_text_embedding(query) [128-dim normalized dense vector]
+        Worker->>DB: Query candidate EvidenceRecords (+ Document join)
+        Worker->>Worker: Compute Hybrid Score (60% Cosine Similarity + 40% Keyword Overlap)
+        alt Best Hybrid Score >= 0.35 (Supporting Archival Evidence Found)
+            Worker->>Worker: Synthesize grounded response directly from top chunk
+            Worker->>Worker: Format citations (document_name, page_or_slide, snippet, verification_status)
+            Worker-->>API: Return status="GROUNDED_ANSWER" with citations array
+            API-->>FE: HTTP 200 OK { status: "GROUNDED_ANSWER", citations, confidence_score }
+            FE-->>User: Renders verified answer with clickable page/slide provenance chips
+        else Best Hybrid Score < 0.35 (No Evidence / Out-of-Scope Query)
+            Worker-->>API: Return status="INSUFFICIENT_EVIDENCE" (Strict refusal message)
+            API-->>FE: HTTP 200 OK { status: "INSUFFICIENT_EVIDENCE", citations: [] }
+            FE-->>User: Displays refusal alert: "Insufficient archival evidence in repository. Hallucination refused."
+        end
+    end
+
+    %% -------------------------------------------------------------
+    %% FLOW 3: HUMAN-ONLY VERIFICATION & AUDIT LOGGING
+    %% -------------------------------------------------------------
+    rect rgb(28, 25, 23)
+        note over User, FS: Flow 3: Human Verification Lifecycle (RBAC Enforced)
+        User->>FE: Verifier reviews claim in VerificationPortal and clicks "Verify Claim"
+        FE->>API: POST /api/v1/evidence/review { evidence_id, status: "verified", notes }
+        API->>API: Validate RBAC Role (User must have 'verifier', 'researcher', or 'admin')
+        API->>DB: Update EvidenceRecord: verification_status="verified", verified_by=User.id, verified_at=UTC
+        API->>DB: Insert AuditLog { action: "EVIDENCE_VERIFIED", entity_id, user_id, timestamp }
+        API->>Worker: Recompute compute_gap_analysis(site_id, db)
+        Worker->>DB: Update HeritageSite.completeness_score (7-category checklist)
+        API-->>FE: HTTP 200 OK (Updated verification record + new completeness score)
+        FE-->>User: UI updates in real-time with certified green badge & updated score
+    end
+
+    %% -------------------------------------------------------------
+    %% FLOW 4: REPORTLAB PDF DOSSIER GENERATION & STREAMING
+    %% -------------------------------------------------------------
+    rect rgb(30, 41, 59)
+        note over User, FS: Flow 4: Archival Dossier PDF Generation & Direct Streaming
+        User->>FE: Clicks "Download PDF Dossier Report" for monument
+        FE->>API: GET /api/v1/reports/site/{site_id}/download-direct
+        API->>Worker: generate_pdf_dossier(site_id, db)
+        Worker->>DB: Query site metadata, completeness checklist, evidence records & audit trail
+        Worker->>Worker: Build ReportLab SimpleDocTemplate (cover page, score badge, tables, disclaimer)
+        Worker->>FS: Save binary PDF to reports/HeritageProof_Dossier_{Site}_{UUID}.pdf
+        Worker-->>API: Absolute file path to generated PDF
+        API-->>FE: HTTP 200 FileResponse (application/pdf with Content-Disposition attachment)
+        FE-->>User: Browser triggers immediate file download of certified archival dossier
+    end

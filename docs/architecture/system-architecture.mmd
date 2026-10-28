@@ -1,0 +1,158 @@
+graph TB
+%% =====================================================================
+%% HERITAGEPROOF — COMPLETE SYSTEM ARCHITECTURE DIAGRAM
+%% Architectural Layers: Presentation, Frontend, API Server, AI/OCR/RAG,
+%% Database/Storage, Guardrails, and Deployment Infrastructure.
+%% =====================================================================
+
+    subgraph CLIENT_LAYER["1. Presentation & Client Layer"]
+        U_PUBLIC["👤 Cultural Tourist / Public Explorer<br/><i>(Read-only, 3D Orbit, Folklore Trails)</i>"]
+        U_RESEARCHER["🔬 Researcher & Archivist<br/><i>(Ingestion, OCR Audit, Claim Verification)</i>"]
+        U_ADMIN["🛡️ System Administrator<br/><i>(RBAC, Security, Audit Logs)</i>"]
+    end
+
+    subgraph FRONTEND_LAYER["2. Frontend Web Application (React 18 + Vite + TailwindCSS)"]
+        direction TB
+        NAV["🧭 Navigation & Role Switcher<br/><code>Navbar.tsx</code> • <i>verifier vs public</i>"]
+        STATUS_BADGE["🟢 Health & Demo Status Banner<br/><code>HealthBadge.tsx</code> • <i>Frontend Online</i>"]
+        
+        subgraph FE_MODULES["Core UI Feature Modules"]
+            FE_OVERVIEW["📊 Capabilities Matrix<br/><code>App.tsx (Overview)</code>"]
+            FE_INGEST["📥 Ingestion Tracker<br/><code>IngestionView.tsx</code>"]
+            FE_OCR["🔤 3-Column OCR Audit<br/><code>OCRComparison.tsx</code>"]
+            FE_VERIFY["✅ Verification Portal<br/><code>VerificationPortal.tsx</code>"]
+            FE_RAG["🔍 Grounded Q&A<br/><code>GroundedQA.tsx</code>"]
+            FE_MAP["🗺️ Gujarat Heritage Map<br/><code>HeritageMap.tsx (WGS 84)</code>"]
+            FE_3D["🏛️ 3D Photogrammetry<br/><code>Model3DViewer.tsx (Three.js)</code>"]
+        end
+
+        subgraph FE_SERVICES["Client State & Data Adapters"]
+            API_CLIENT["📡 API Client Layer<br/><code>src/services/api.ts</code>"]
+            DEMO_STORE["💾 Canonical Demo Store<br/><code>src/services/demoData.ts</code>"]
+        end
+    end
+
+    subgraph API_LAYER["3. API Gateway & Application Server (FastAPI + Uvicorn)"]
+        direction TB
+        FASTAPI_CORE["⚡ FastAPI Application Instance<br/><code>backend/app/main.py</code> • <i>Lifespan Management</i>"]
+        CORS_MW["🛡️ CORS Middleware<br/><i>(Localhost + *.vercel.app Regex)</i>"]
+        AUTH_MW["🔐 Security & Auth Dependencies<br/><code>app/api/deps.py</code> • <i>JWT Bearer + RBAC</i>"]
+        
+        subgraph ROUTERS["API v1 Routers (prefix: /api/v1)"]
+            R_HEALTH["/health<br/><code>health.py</code>"]
+            R_AUTH["/auth<br/><code>auth.py</code>"]
+            R_DOCS["/documents<br/><code>documents.py</code>"]
+            R_OCR["/ocr<br/><code>ocr.py</code>"]
+            R_EVID["/evidence<br/><code>evidence.py</code>"]
+            R_REPORTS["/reports<br/><code>reports.py</code>"]
+            R_SEARCH["/search<br/><code>search.py</code>"]
+            R_SITES["/sites<br/><code>sites.py</code>"]
+            R_JOURNEYS["/journeys<br/><code>journeys.py</code>"]
+            R_PHOTO["/photogrammetry<br/><code>photogrammetry.py</code>"]
+        end
+    end
+
+    subgraph PIPELINE_LAYER["4. Ingestion, OCR & AI Processing Pipeline"]
+        direction TB
+        subgraph INGEST_SERVICES["Multi-Format Parsers"]
+            P_PDF["📄 PDF Parser<br/><code>pdf_parser.py</code> <i>(pypdf)</i>"]
+            P_PPTX["📊 PPTX Parser<br/><code>pptx_parser.py</code> <i>(python-pptx)</i>"]
+            P_DOCX["📝 DOCX Parser<br/><code>docx_parser.py</code> <i>(python-docx)</i>"]
+            P_IMG["🖼️ Image Parser<br/><code>image_parser.py</code> <i>(EXIF GPS / PIL)</i>"]
+            P_ZIP["📦 ZipSlip Validator<br/><code>zip_extractor.py</code>"]
+            P_HASH["🔑 SHA-256 Hasher<br/><code>validator.py</code>"]
+        end
+
+        subgraph OCR_SERVICES["OCR & Translation Engine"]
+            OCR_FACTORY["🏭 OCR Engine Factory<br/><code>ocr/factory.py</code>"]
+            OCR_TESS["🔎 Tesseract OCR<br/><code>tesseract_engine.py</code>"]
+            OCR_VISION["👁️ Vision Transformer<br/><code>vision_engine.py</code>"]
+            TRANSLATOR["🌐 Indic Translator<br/><code>translator.py</code> <i>(Gujarati / Devanagari)</i>"]
+        end
+
+        subgraph RAG_SERVICES["Semantic Retrieval & Q&A Engine"]
+            EMBED["📐 128-Dim Dense Embeddings<br/><code>embeddings.py</code> <i>(Indic n-gram hashing)</i>"]
+            RETRIEVER["🎯 Hybrid Vector-Lexical Retriever<br/><code>retriever.py</code> <i>(60% Sim + 40% Keyword)</i>"]
+            QA_ENGINE["🤖 Grounded Q&A Synthesizer<br/><code>qa_engine.py</code> <i>(0.35 Threshold / Refusal)</i>"]
+        end
+
+        subgraph AUDIT_SERVICES["Analysis & Dossier Generators"]
+            GAP_ANALYSIS["📈 7-Category Gap Analysis<br/><code>gap_analysis.py</code> <i>(Completeness %)</i>"]
+            REPORT_GEN["📑 ReportLab PDF Generator<br/><code>report_generator.py</code> <i>(Dossier PDF)</i>"]
+        end
+    end
+
+    subgraph DATA_LAYER["5. Database & Storage Layer"]
+        direction TB
+        SQLA_ENGINE["⚙️ SQLAlchemy 2.0 Engine<br/><code>backend/app/core/database.py</code>"]
+        
+        subgraph RELATIONAL_DB["Relational Schema (SQLite / PostgreSQL)"]
+            T_USERS[("users<br/><i>ID, Email, Role, HashedPwd</i>")]
+            T_DOCS[("documents<br/><i>SHA-256, Size, Mime, Path</i>")]
+            T_JOBS[("processing_jobs<br/><i>Stage, Status, Attempt</i>")]
+            T_EVID[("evidence_records<br/><i>Text, Status, VerifiedBy</i>")]
+            T_SITES[("heritage_sites<br/><i>Coords, Era, Score</i>")]
+            T_MEDIA[("site_media<br/><i>Type, URL, Caption</i>")]
+            T_CHECK[("checklist_items<br/><i>Category, IsFulfilled</i>")]
+            T_AUDIT[("audit_logs<br/><i>Action, Entity, Timestamp</i>")]
+            T_JOURN[("heritage_journeys<br/><i>Title, Region, Era</i>")]
+            T_STOPS[("heritage_journey_stops<br/><i>StopOrder, Lat, Long</i>")]
+        end
+
+        subgraph FILE_STORAGE["Filesystem Storage (Local /tmp Fallback)"]
+            FS_UPLOADS["📁 uploads/<br/><i>Raw PDF, PPTX, Images, ZIP</i>"]
+            FS_REPORTS["📁 reports/<br/><i>Generated PDF Dossiers</i>"]
+        end
+    end
+
+    subgraph GUARDRAILS_LAYER["6. Security, Integrity & Verification Guardrails"]
+        G_HUMAN["🛑 Human-Only Verification Rule<br/><i>AI cannot certify claims; requires researcher/admin session</i>"]
+        G_INTEGRITY["🔐 Cryptographic Deduplication<br/><i>SHA-256 hash uniquely identifies archival provenance</i>"]
+        G_DISCLAIMER["⚠️ Conservation Safety Disclaimer<br/><i>Completeness Score ≠ Structural/Civil Engineering Safety</i>"]
+        G_REFUSAL["🚫 Hallucination Refusal Fallback<br/><i>Returns INSUFFICIENT_EVIDENCE when confidence < 0.35</i>"]
+    end
+
+    subgraph DEPLOY_LAYER["7. Deployment Infrastructure"]
+        V_FE["☁️ Vercel Edge Frontend<br/><code>hackcult-five.vercel.app</code> • <i>Vite Static Build</i>"]
+        V_BE["⚡ Vercel Serverless / AWS Lambda<br/><code>/api/index.py</code> • <i>Ephemeral /tmp Execution</i>"]
+        GH_REPO["🐙 GitHub Repository<br/><code>shivam-raj4102006/HACKCULT</code> • <i>Branch: main</i>"]
+    end
+
+    %% Data Flow Connections
+    CLIENT_LAYER -->|HTTPS Request / UI Interaction| FRONTEND_LAYER
+    NAV --> FE_MODULES
+    FE_MODULES --> API_CLIENT
+    API_CLIENT -.->|Fallback if Offline| DEMO_STORE
+    API_CLIENT ==>|REST JSON API / FormData| FASTAPI_CORE
+
+    FASTAPI_CORE --> CORS_MW
+    CORS_MW --> AUTH_MW
+    AUTH_MW --> ROUTERS
+
+    R_DOCS --> INGEST_SERVICES
+    R_OCR --> OCR_SERVICES
+    R_SEARCH --> RAG_SERVICES
+    R_EVID --> GAP_ANALYSIS
+    R_REPORTS --> REPORT_GEN
+    R_SITES & R_JOURNEYS --> SQLA_ENGINE
+
+    INGEST_SERVICES --> P_HASH
+    P_HASH --> FS_UPLOADS
+    INGEST_SERVICES --> RAG_SERVICES
+    OCR_SERVICES --> RAG_SERVICES
+    REPORT_GEN --> FS_REPORTS
+
+    ROUTERS ==> SQLA_ENGINE
+    SQLA_ENGINE ==> RELATIONAL_DB
+
+    %% Guardrail enforcement
+    R_EVID -.-> G_HUMAN
+    P_HASH -.-> G_INTEGRITY
+    GAP_ANALYSIS -.-> G_DISCLAIMER
+    QA_ENGINE -.-> G_REFUSAL
+
+    %% Deployment mapping
+    FRONTEND_LAYER -.->|Hosted via| V_FE
+    API_LAYER -.->|Serverless runtime| V_BE
+    GH_REPO -.->|Git CI/CD Trigger| V_FE
+    GH_REPO -.->|Git CI/CD Trigger| V_BE
